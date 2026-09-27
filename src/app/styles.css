@@ -1,0 +1,1004 @@
+/* =========================================================================
+   トークン
+   ========================================================================= */
+
+:root {
+  /* 色は rgb の成分でも持ち、透明度を変えて使うときは rgb(var(--x-rgb) / a) と書く */
+  --bg-rgb: 2 1 8;
+  --text-rgb: 238 240 255;
+  --cyan-rgb: 94 242 255;
+  --magenta-rgb: 255 92 225;
+  --gold-rgb: 255 207 92;
+  --score-rgb: 255 246 221;
+
+  --bg: rgb(var(--bg-rgb));
+  --surface: #0a0619;
+  --line: rgb(var(--text-rgb) / 0.25);
+  --line-strong: rgb(var(--text-rgb) / 0.8);
+  --text: rgb(var(--text-rgb));
+  --muted: #9a98c4;
+  --cyan: rgb(var(--cyan-rgb));
+  --magenta: rgb(var(--magenta-rgb));
+  --gold: rgb(var(--gold-rgb));
+  --score: rgb(var(--score-rgb));
+  --on-accent: #05030d;
+
+  --display: 'Dela Gothic One', system-ui, sans-serif;
+  --body: system-ui, -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+
+  --radius: 10px;
+  --radius-lg: 12px;
+  --gutter: 16px;
+  --content-width: 440px;
+  --touch: 52px;
+  --touch-sm: 44px;
+
+  /* 重なりの順。HUD とゲームは 0、全画面の画面はその上、開発用パネル、ダイアログの順に前へ出る */
+  --z-overlay: 10;
+  --z-dev: 40;
+  --z-modal: 50;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  color-scheme: dark;
+}
+
+/* =========================================================================
+   ベース
+   ========================================================================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ゲーム中は、スクロール・引っ張って更新・長押しメニュー・文字選択を止める */
+html[data-route='breakout'],
+html[data-route='breakout'] body {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ボタンは見た目を持たない状態から始め、見た目は各部品のクラスで与える */
+button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+/* hidden 属性は、display を指定した部品にも必ず効かせる */
+[hidden] {
+  display: none !important;
+}
+
+a {
+  color: var(--cyan);
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 12px;
+}
+
+/* =========================================================================
+   部品
+   ========================================================================= */
+
+/* ボタン: 枠線だけの通常と、塗りつぶしのメイン（data-variant="primary"）の 2 種類 */
+.btn {
+  min-height: var(--touch);
+  width: 100%;
+  padding: 0 18px;
+  border-radius: var(--radius);
+  border: 2px solid var(--line-strong);
+  background: rgb(var(--bg-rgb) / 0.4);
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+  transition:
+    transform 0.08s ease,
+    background 0.08s ease;
+}
+
+.btn:active {
+  transform: translateY(2px);
+  background: rgb(var(--text-rgb) / 0.12);
+}
+
+.btn[data-variant='primary'] {
+  border-color: var(--cyan);
+  background: var(--cyan);
+  color: var(--on-accent);
+}
+
+.icon-btn {
+  width: var(--touch-sm);
+  height: var(--touch-sm);
+  flex: none;
+  border-radius: var(--radius);
+  border: 2px solid rgb(var(--text-rgb) / 0.5);
+  background: rgb(var(--bg-rgb) / 0.5);
+  display: grid;
+  place-items: center;
+}
+
+/* 押せない間もフォーカスは保つ（disabled にするとフォーカスが外れる）ので、aria-disabled で見た目だけ変える */
+.icon-btn[aria-disabled='true'] {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.pause-icon {
+  width: 14px;
+  height: 16px;
+  border-left: 4px solid var(--text);
+  border-right: 4px solid var(--text);
+}
+
+.gear-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 3px dotted var(--text);
+  box-shadow: inset 0 0 0 3px var(--text);
+}
+
+/* もどる: リンクでもボタンでも同じ見た目 */
+.back {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-sm);
+  color: var(--muted);
+  text-decoration: none;
+  font-family: var(--body);
+  font-size: 15px;
+}
+
+.panel {
+  width: 100%;
+  max-width: 360px;
+  padding: 22px 18px;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 2px solid var(--line);
+  display: grid;
+  gap: 12px;
+}
+
+.panel-title {
+  margin-bottom: 6px;
+  text-align: center;
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: 0.2em;
+}
+
+.panel p {
+  line-height: 1.6;
+}
+
+.panel-message {
+  text-align: center;
+  color: var(--muted);
+}
+
+/* パネル下端のボタン群。上の中身（設定項目や文章）とはっきり区切る */
+.panel-actions {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.action-list {
+  width: 100%;
+  max-width: 320px;
+  display: grid;
+  gap: 10px;
+}
+
+.screen-title {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(28px, 9vw, 40px);
+  letter-spacing: 0.2em;
+  margin-right: -0.2em;
+}
+
+/* 設定の 1 項目。オン / オフをラジオボタンで選ぶ。ラジオは見えなくし、隣のラベルの文字をボタンの見た目にする */
+.setting {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.setting-label {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.segmented label {
+  position: relative;
+  display: grid;
+  cursor: pointer;
+}
+
+.segmented input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.segmented span {
+  min-height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  border: 2px solid rgb(var(--text-rgb) / 0.35);
+  font-family: var(--display);
+  font-size: 15px;
+  text-align: center;
+}
+
+.segmented input:checked + span {
+  border-color: var(--cyan);
+  background: var(--cyan);
+  color: var(--on-accent);
+}
+
+.segmented input:focus-visible + span {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+/* 全画面の土台（Overlay）。安全領域を避け、中身は 1 列で、収まらないときは縦にだけスクロールする */
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: calc(var(--gutter) + var(--safe-top)) calc(var(--gutter) + var(--safe-right)) calc(var(--gutter) + var(--safe-bottom))
+    calc(var(--gutter) + var(--safe-left));
+}
+
+.overlay[data-tone='solid'] {
+  background: var(--bg);
+}
+
+.overlay[data-tone='dim'] {
+  background: rgb(var(--bg-rgb) / 0.72);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.overlay[data-tone='clear'] {
+  background: rgb(var(--bg-rgb) / 0.3);
+}
+
+.overlay[data-layer='modal'] {
+  position: fixed;
+  z-index: var(--z-modal);
+}
+
+.overlay-top {
+  flex: none;
+  width: 100%;
+  max-width: var(--content-width);
+  min-height: var(--touch-sm);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 上下の auto の余白で、収まるときは中央に置き、収まらないときは上から並べる */
+.overlay-body {
+  flex: none;
+  margin-block: auto;
+  width: 100%;
+  max-width: var(--content-width);
+  padding-block: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+
+.overlay-body > * {
+  flex: none;
+  max-width: 100%;
+}
+
+/* =========================================================================
+   ポータル
+   ========================================================================= */
+
+.portal {
+  min-height: 100dvh;
+  width: 100%;
+  max-width: calc(var(--content-width) + 40px + var(--safe-left) + var(--safe-right));
+  margin: 0 auto;
+  padding: calc(56px + var(--safe-top)) calc(20px + var(--safe-right)) calc(28px + var(--safe-bottom)) calc(20px + var(--safe-left));
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+/* ロゴ: 白い DOPAGAKI を本文の幅いっぱいに、GAMES をシアンで字間を広げて添える。
+   DOPAGAKI の幅は文字の大きさの約 7 倍なので、12.3vw（左右の余白 20px ずつを除いた幅に収まる大きさ）を上限の手前まで使う */
+.portal-logo {
+  margin: 0;
+  font-family: var(--display);
+  font-weight: 400;
+  line-height: 0.92;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.portal-logo-main {
+  font-size: clamp(36px, 12.3vw, 62px);
+  color: #fff;
+  text-shadow: 0 0 14px rgb(var(--cyan-rgb) / 0.35);
+}
+
+.portal-logo-sub {
+  margin-top: 0.35em;
+  font-size: clamp(16px, 5vw, 24px);
+  letter-spacing: 0.6em;
+  color: var(--cyan);
+}
+
+/* ゲームの一覧: 番号・名前・矢印の行を、線で区切って並べる */
+.portal-games {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 2px solid var(--line);
+}
+
+.portal-games li {
+  border-bottom: 2px solid var(--line);
+}
+
+.portal-game {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 88px;
+  padding: 16px 4px;
+  color: var(--text);
+  text-decoration: none;
+  transition: transform 0.08s ease;
+}
+
+.portal-game:active {
+  transform: translateY(2px);
+}
+
+.portal-game-no {
+  font-family: var(--display);
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.portal-game-title {
+  min-width: 0;
+  font-family: var(--display);
+  font-size: clamp(24px, 7.5vw, 32px);
+  line-height: 1.2;
+}
+
+.portal-game-arrow {
+  font-family: var(--display);
+  font-size: 24px;
+  color: var(--cyan);
+  transition: transform 0.15s ease;
+}
+
+@media (hover: hover) {
+  .portal-game:hover .portal-game-arrow {
+    transform: translateX(4px);
+  }
+}
+
+/* =========================================================================
+   ブロック崩し: 画面と HUD
+   ========================================================================= */
+
+/* 画面全体を覆う土台。ゲームの描画領域・HUD・各画面をこの中に重ねる */
+.screen {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+.stage canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: calc(6px + var(--safe-top)) calc(12px + var(--safe-right)) 2px calc(12px + var(--safe-left));
+  display: grid;
+  /* スコアを真ん中に、一時停止を右上に置く。左の列は右と同じ幅で、スコアを中央に保つための空き */
+  grid-template-columns: minmax(var(--touch-sm), 1fr) auto minmax(var(--touch-sm), 1fr);
+  grid-template-rows: auto 18px;
+  grid-template-areas:
+    '. score pause'
+    'chain chain chain';
+  column-gap: 8px;
+  pointer-events: none;
+  transition: opacity 0.25s;
+  font-family: var(--display);
+}
+
+/* 隠している間は、見えないだけでなく、フォーカスも読み上げも届かないようにする */
+.hud[data-visible='false'],
+.hud-lives[data-visible='false'] {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.25s,
+    visibility 0s 0.25s;
+}
+
+.hud-pause {
+  grid-area: pause;
+  justify-self: end;
+  align-self: start;
+  pointer-events: auto;
+}
+
+.hud-label {
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  color: var(--muted);
+}
+
+/* スコア: 画面で一番大きな要素。跳ね（--bump）と光（--glow）は HUD の書き込み係が毎フレーム変える */
+.hud-score-row {
+  grid-area: score;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.hud-score {
+  --bump: 0;
+  --glow: 0;
+  font-size: clamp(28px, 9vw, 36px);
+  line-height: 1.05;
+  /* 最初のプレイの前はスコアが空なので、1 行分の高さを確保して HUD の高さ（フィールドの上端）を変えない */
+  min-height: 1lh;
+  font-variant-numeric: tabular-nums;
+  color: var(--score);
+  white-space: nowrap;
+  transform: scale(calc(1 + 0.14 * var(--bump)));
+  transform-origin: 50% 60%;
+  will-change: transform;
+  text-shadow:
+    0 0 calc(3px + 6px * var(--glow)) rgb(var(--score-rgb) / 0.7),
+    0 0 calc(8px + 18px * var(--glow)) rgb(var(--gold-rgb) / 0.6),
+    0 0 calc(12px + 32px * var(--glow)) rgb(var(--magenta-rgb) / calc(0.15 + 0.45 * var(--glow)));
+}
+
+.hud-best {
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.hud-newbest {
+  margin-left: 6px;
+  color: var(--gold);
+  display: none;
+}
+
+.hud-newbest[data-active='true'] {
+  display: inline;
+  animation: pop-in 0.4s cubic-bezier(0.2, 1.8, 0.4, 1);
+}
+
+.hud-chain {
+  grid-area: chain;
+  text-align: center;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+  opacity: 0;
+  transition: opacity 0.2s;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hud-chain[data-active='true'] {
+  opacity: 1;
+}
+
+/* 画面下端の安全領域の高さを測るための要素。見えず、並びにも影響しない */
+.hud-safe-probe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: var(--safe-bottom);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.hud-lives {
+  position: absolute;
+  right: calc(12px + var(--safe-right));
+  bottom: calc(10px + var(--safe-bottom));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  background: rgb(var(--bg-rgb) / 0.6);
+  border: 1px solid var(--line);
+  font-family: var(--display);
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+
+.hud-lives-dots {
+  display: flex;
+  gap: 7px;
+}
+
+.hud-lives-dots span {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid rgb(var(--magenta-rgb) / 0.35);
+  transition:
+    background 0.2s,
+    box-shadow 0.2s,
+    border-color 0.2s;
+}
+
+.hud-lives-dots span[data-on='true'] {
+  border-color: var(--magenta);
+  background: var(--magenta);
+  box-shadow: 0 0 6px var(--magenta);
+}
+
+/* =========================================================================
+   ブロック崩し: 各画面
+   ========================================================================= */
+
+.loading-text {
+  font-family: var(--display);
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+
+/* タイトル */
+
+.title-logo {
+  font-family: var(--display);
+  font-weight: 400;
+  line-height: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: clamp(40px, 14vw, 88px);
+  margin-bottom: 20px;
+  color: #fff;
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.7),
+    0 0 16px var(--cyan),
+    0 0 38px rgb(var(--cyan-rgb) / 0.4);
+}
+
+.title-logo span:last-child {
+  font-size: 1.2em;
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.7),
+    0 0 16px var(--magenta),
+    0 0 38px rgb(var(--magenta-rgb) / 0.45);
+}
+
+.choice-list {
+  width: 100%;
+  display: grid;
+  gap: 14px;
+}
+
+.choice {
+  --accent: var(--cyan);
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--accent);
+  background: rgb(var(--bg-rgb) / 0.7);
+  text-align: left;
+  transition: transform 0.08s ease;
+}
+
+.choice[data-accent='magenta'] {
+  --accent: var(--magenta);
+}
+
+.choice:active {
+  transform: translateY(2px);
+}
+
+.choice-name {
+  font-family: var(--display);
+  font-size: clamp(22px, 7vw, 28px);
+  letter-spacing: 0.1em;
+}
+
+.choice-desc {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  /* 日本語を単語の途中で折り返さない。折り返してよい位置には <wbr> を置く */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.choice-meta {
+  font-family: var(--display);
+  font-size: 13px;
+  color: var(--gold);
+}
+
+/* ステージ選択 */
+
+.stage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: grid;
+  gap: 10px;
+}
+
+.stage-row {
+  width: 100%;
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: var(--radius-lg);
+  border: 2px solid rgb(var(--magenta-rgb) / 0.7);
+  background: rgb(var(--bg-rgb) / 0.7);
+  text-align: left;
+  transition: transform 0.08s ease;
+}
+
+.stage-row:active {
+  transform: translateY(2px);
+}
+
+.stage-row:disabled {
+  opacity: 0.4;
+}
+
+.stage-row[data-cleared='true'] {
+  border-color: var(--gold);
+}
+
+.stage-row-no {
+  font-family: var(--display);
+  font-size: 26px;
+  text-align: center;
+}
+
+.stage-row-name {
+  font-family: var(--display);
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stage-row-meta {
+  font-family: var(--display);
+  font-size: 11px;
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+/* タップしてスタート */
+
+.ready-title {
+  font-family: var(--display);
+  font-size: clamp(34px, 11vw, 44px);
+  letter-spacing: 0.08em;
+  text-shadow:
+    0 0 8px rgba(255, 255, 255, 0.8),
+    0 0 24px var(--cyan);
+  animation: pop-in 0.5s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.ready-sub {
+  font-family: var(--display);
+  letter-spacing: 0.3em;
+  margin-right: -0.3em;
+  color: var(--muted);
+}
+
+.ready-cta {
+  margin-top: 20px;
+  min-height: var(--touch-sm);
+  padding: 0 12px;
+  font-family: var(--display);
+  font-size: 20px;
+  letter-spacing: 0.12em;
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+/* 結果。演出の時刻（--result-*）は、結果画面が controller.ts の RESULT_REVEAL から渡す */
+
+.result-heading {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(40px, 13vw, 80px);
+  line-height: 1;
+  color: #fff;
+  text-shadow:
+    0 0 8px rgba(255, 255, 255, 0.7),
+    0 0 22px var(--magenta),
+    0 0 50px rgb(var(--magenta-rgb) / 0.5);
+  animation: slam var(--result-heading-duration) cubic-bezier(0.2, 1.5, 0.35, 1) both;
+}
+
+[data-cleared='true'] .result-heading {
+  text-shadow:
+    0 0 8px rgba(255, 255, 255, 0.7),
+    0 0 22px var(--gold),
+    0 0 50px rgb(var(--gold-rgb) / 0.55);
+}
+
+.result-stage {
+  margin-top: -6px;
+  font-family: var(--display);
+  color: var(--muted);
+  letter-spacing: 0.16em;
+  font-size: 13px;
+}
+
+.result-score {
+  display: grid;
+  gap: 4px;
+  animation: pop-in var(--result-pop-duration) var(--result-score-delay) cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.result-label {
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  color: var(--muted);
+}
+
+.result-total {
+  font-family: var(--display);
+  font-size: clamp(36px, 12vw, 64px);
+  font-variant-numeric: tabular-nums;
+  color: var(--score);
+  text-shadow: 0 0 16px rgb(var(--gold-rgb) / 0.45);
+}
+
+.result-newbest {
+  font-family: var(--display);
+  font-size: 18px;
+  color: var(--gold);
+  animation: pop-in var(--result-pop-duration) var(--result-newbest-delay) cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+
+.result-best {
+  font-family: var(--display);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* =========================================================================
+   開発用パネル（開発ビルドのみ）
+   ========================================================================= */
+
+.dev {
+  position: absolute;
+  left: calc(6px + var(--safe-left));
+  bottom: calc(6px + var(--safe-bottom));
+  z-index: var(--z-dev);
+  font: 11px/1.4 ui-monospace, monospace;
+  max-width: calc(100% - 12px);
+}
+
+.dev-toggle {
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.dev-body {
+  margin-top: 4px;
+  padding: 8px;
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.82);
+  border: 1px solid var(--line);
+  max-height: 55vh;
+  overflow: auto;
+}
+
+.dev-body p {
+  margin: 0 0 4px;
+}
+
+.dev-row {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.dev-row button {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dev fieldset {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 6px 0;
+  padding: 4px 6px;
+}
+
+.dev label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dev input {
+  width: 80px;
+  background: #111;
+  color: #fff;
+  border: 1px solid #333;
+  font: inherit;
+}
+
+/* =========================================================================
+   アニメーション
+   ========================================================================= */
+
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.97);
+  }
+}
+
+/* 60% で縮みきって着地する。結果画面はこの直後から操作を受け付ける（RESULT_REVEAL.settleMs） */
+@keyframes slam {
+  0% {
+    opacity: 0;
+    transform: scale(3.2) rotate(-4deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.94) rotate(0.5deg);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 動きを減らす設定では、アニメーションと HUD のスコアの跳ねを止める。要素は最後の状態で表示する */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+  }
+
+  .hud-score {
+    transform: none;
+  }
+}
