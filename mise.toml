@@ -1,3 +1,5 @@
 [tools]
+betterleaks = "1.8.1"
 bun = "1.4.2"
+lefthook = "2.1.14"
 node = "24.21.0"
