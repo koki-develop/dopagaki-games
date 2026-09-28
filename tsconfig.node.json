@@ -24,6 +24,6 @@
     "exactOptionalPropertyTypes": true,
     "allowUnreachableCode": false
   },
-  "include": ["vite.config.ts", "build"],
+  "include": ["vite.config.ts", "oxlint.config.ts", "build"],
   "exclude": ["build/**/*.test.ts", "build/**/*.test-support.ts"]
 }
