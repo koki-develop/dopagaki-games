@@ -613,8 +613,8 @@ p {
   opacity: 1;
 }
 
-/* 画面下端の安全領域の高さを測るための要素。見えず、並びにも影響しない */
-.hud-safe-probe {
+/* フィールドの下に空ける高さを測るための要素。見えず、並びにも影響しない */
+.hud-bottom-probe {
   position: absolute;
   top: 0;
   left: 0;
@@ -622,6 +622,13 @@ p {
   height: var(--safe-bottom);
   visibility: hidden;
   pointer-events: none;
+}
+
+/* 指で操作する端末では、パドルが指で隠れないよう、フィールドの下に指を置く余白を足す */
+@media (pointer: coarse) {
+  .hud-bottom-probe {
+    height: calc(var(--safe-bottom) + 80px);
+  }
 }
 
 .hud-lives {

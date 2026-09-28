@@ -65,7 +65,7 @@ export type SessionCallbacks = {
 export type HudLayout = {
   /** 画面上端から HUD の下端までの CSS ピクセル */
   top: number;
-  /** 画面下端から空けておく CSS ピクセル（安全領域） */
+  /** 画面下端から空けておく CSS ピクセル（安全領域と、指で操作する端末で指を置く余白） */
   bottom: number;
   /** スコアの中心。ゲームの描画領域の左上からの CSS ピクセル */
   scoreAnchor: { x: number; y: number } | null;

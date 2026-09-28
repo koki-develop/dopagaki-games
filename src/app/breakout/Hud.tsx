@@ -23,7 +23,7 @@ const boxOf = (r: DOMRect): Box => ({ left: r.left, top: r.top, width: r.width, 
  * プレイ中の HUD。スコア・ベスト・chain・一時停止ボタンを上端に、ステージの残機を右下に置く。
  *
  * - 中身の数字は React を通さず、HudPresenter が毎フレーム DOM へ直接書く
- * - HUD の下端・画面下端の安全領域・スコアの中心を測り、ゲームへ伝える。フィールドは HUD の下に収まり、
+ * - HUD の下端・フィールドの下に空ける高さ・スコアの中心を測り、ゲームへ伝える。フィールドは HUD の下に収まり、
  *   得点に変わった光はスコアへ吸い込まれる。測り直すのは HUD の大きさが変わったときだけ
  * - 位置は、この HUD と同じ親を覆うゲームの描画領域の左上を原点にする
  */
@@ -37,7 +37,7 @@ export default function Hud({ feed, session, visible, showLives, canPause, onPau
   const chainRef = useRef<HTMLSpanElement>(null);
   const livesRef = useRef<HTMLDivElement>(null);
   const livesDotsRef = useRef<HTMLSpanElement>(null);
-  const safeProbeRef = useRef<HTMLSpanElement>(null);
+  const bottomProbeRef = useRef<HTMLSpanElement>(null);
 
   // 毎フレームの数字の書き込み
   useEffect(() => {
@@ -60,7 +60,7 @@ export default function Hud({ feed, session, visible, showLives, canPause, onPau
   useEffect(() => {
     const root = rootRef.current;
     const scoreWrap = scoreWrapRef.current;
-    const probe = safeProbeRef.current;
+    const probe = bottomProbeRef.current;
     if (!session || !root || !scoreWrap || !probe) return;
     let last: HudLayout | null = null;
     const measure = () => {
@@ -105,8 +105,8 @@ export default function Hud({ feed, session, visible, showLives, canPause, onPau
         <div ref={chainWrapRef} className="hud-chain">
           <span ref={chainRef} />
         </div>
-        {/* 画面下端の安全領域の高さを測るための、見えない要素 */}
-        <span ref={safeProbeRef} className="hud-safe-probe" aria-hidden="true" />
+        {/* フィールドの下に空ける高さを測るための、見えない要素 */}
+        <span ref={bottomProbeRef} className="hud-bottom-probe" aria-hidden="true" />
       </div>
 
       {/* ステージの残機は、目に入りやすい右下に置く */}

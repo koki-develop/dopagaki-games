@@ -5,12 +5,12 @@ export type Box = { left: number; top: number; width: number; height: number };
 /**
  * HUD の配置を、画面上の矩形から求める。
  * origin はゲームの描画領域、hud は HUD 全体、score はスコアの枠（変形をかける前の位置）。
- * safeBottom は画面下端の安全領域（CSS ピクセル）。
+ * bottom はフィールドの下に空ける高さ（CSS ピクセル）。
  */
-export function computeHudLayout(origin: Box, hud: Box, score: Box | null, safeBottom: number): HudLayout {
+export function computeHudLayout(origin: Box, hud: Box, score: Box | null, bottom: number): HudLayout {
   return {
     top: Math.max(0, hud.top + hud.height - origin.top),
-    bottom: Math.max(0, safeBottom),
+    bottom: Math.max(0, bottom),
     scoreAnchor: score ? { x: score.left + score.width / 2 - origin.left, y: score.top + score.height / 2 - origin.top } : null,
   };
 }
