@@ -81,7 +81,7 @@ async function setup(opts: SetupOptions = {}) {
     createInput: (handlers, clock) => (input = new FakeInput(handlers, clock)),
     surface: { width: 390, height: 844, observe: () => () => {} },
     audio: new AudioEngine(() => null),
-    settings: { get: () => ({ shake: true }), cameraMotionScale: 1, subscribe: () => () => {} },
+    settings: { cameraMotion: { shake: 1, pulse: 1, pull: 1 }, subscribe: () => () => {} },
     vibrate: () => {},
     randomSeed: () => 42,
     now: () => now,

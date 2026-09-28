@@ -1,8 +1,9 @@
+import type { CameraMotion } from './camera.ts';
 import { safeLocalStorage } from './storage.ts';
 import type { StorageLike } from './storage.ts';
 
 export type Settings = {
-  /** 画面の揺れ */
+  /** 画面の揺れ。衝撃による揺れと、ビートに合わせた拍動の両方 */
   shake: boolean;
   /** 効果音 */
   sfx: boolean;
@@ -19,6 +20,19 @@ export const VOLUME_BGM = 0.7;
 
 /** `prefers-reduced-motion: reduce` のときの、カメラの引きとビートの拍動の倍率 */
 const REDUCED_CAMERA_MOTION = 0.3;
+
+/**
+ * ユーザー設定から、カメラの動きの種類ごとの倍率を決める。
+ * 画面の揺れをオフにすると、衝撃による揺れとビートの拍動を止める。
+ * `prefers-reduced-motion: reduce` では、拍動と引きを弱める。
+ */
+export function cameraMotionFor(s: Settings, reducedMotion: boolean, out: CameraMotion): CameraMotion {
+  const motion = reducedMotion ? REDUCED_CAMERA_MOTION : 1;
+  out.shake = s.shake ? 1 : 0;
+  out.pulse = s.shake ? motion : 0;
+  out.pull = motion;
+  return out;
+}
 
 /** `prefers-reduced-motion` の問い合わせ結果として使う MediaQueryList の一部 */
 export type MotionQuery = {
@@ -54,6 +68,8 @@ type Listener = () => void;
 export class SettingsStore {
   private value: Settings;
   private reduced: boolean;
+  /** 毎フレーム読まれるので、作り直さずに設定が変わったときだけ書き換える */
+  private readonly motion: CameraMotion = { shake: 1, pulse: 1, pull: 1 };
   private readonly listeners = new Set<Listener>();
   private readonly storage: StorageLike | null;
 
@@ -62,9 +78,11 @@ export class SettingsStore {
     this.reduced = motion?.matches ?? false;
     motion?.addEventListener('change', (e) => {
       this.reduced = e.matches;
+      cameraMotionFor(this.value, this.reduced, this.motion);
       this.emit();
     });
     this.value = this.load();
+    cameraMotionFor(this.value, this.reduced, this.motion);
   }
 
   get = (): Settings => this.value;
@@ -74,13 +92,14 @@ export class SettingsStore {
     return this.reduced;
   }
 
-  /** カメラの引きとビートの拍動に掛ける倍率 */
-  get cameraMotionScale(): number {
-    return this.reduced ? REDUCED_CAMERA_MOTION : 1;
+  /** カメラの動きの種類ごとの倍率。設定が変わると同じオブジェクトの中身が変わる */
+  get cameraMotion(): Readonly<CameraMotion> {
+    return this.motion;
   }
 
   update(patch: Partial<Settings>): void {
     this.value = sanitizeSettings({ ...this.value, ...patch }, this.value);
+    cameraMotionFor(this.value, this.reduced, this.motion);
     this.save();
     this.emit();
   }

@@ -8,7 +8,7 @@ import type { QualityLevel } from '../../engine/quality.ts';
 import { RenderHost } from '../../engine/render-host.ts';
 import { audio } from '../../juice/audio/engine.ts';
 import type { AudioEngine } from '../../juice/audio/engine.ts';
-import type { CameraOffset } from '../../juice/camera.ts';
+import type { CameraMotion, CameraOffset } from '../../juice/camera.ts';
 import { FlashLimiter } from '../../juice/flash.ts';
 import { vibrate } from '../../juice/haptics.ts';
 import { settings } from '../../juice/settings.ts';
@@ -83,9 +83,8 @@ type SessionSurface = {
 
 /** セッションが読む設定 */
 type SessionSettings = {
-  get(): { readonly shake: boolean };
-  /** カメラの引きとビートの拍動に掛ける倍率 */
-  readonly cameraMotionScale: number;
+  /** カメラの動きの種類ごとの倍率 */
+  readonly cameraMotion: Readonly<CameraMotion>;
   subscribe(listener: () => void): () => void;
 };
 
@@ -425,8 +424,7 @@ class GameSession implements SessionHandle {
     const view = this.view;
     const run = this.run;
     if (run) {
-      const s = this.env.settings;
-      run.camera.sample(s.get().shake ? 1 : 0, s.cameraMotionScale, this.camOut);
+      run.camera.sample(this.env.settings.cameraMotion, this.camOut);
       view.apply(run.fx, run.frameTime);
       view.sync(run, run.alpha, run.input.target, this.camOut, worldAdvanced);
       return;

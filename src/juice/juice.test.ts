@@ -110,8 +110,9 @@ describe('WorldClock', () => {
 describe('CameraRig', () => {
   const opts = { maxOffset: 0.4, maxRotation: 0.05, decayPerSecond: 1, frequency: 20 };
   const out: CameraOffset = { x: 0, y: 0, rotation: 0, zoom: 1 };
+  const full = { shake: 1, pulse: 1, pull: 1 };
 
-  test('揺れは trauma² に比例し、設定の倍率 0 なら揺れない', () => {
+  test('揺れは trauma² に比例し、揺れの倍率 0 なら揺れない', () => {
     const cam = new CameraRig(opts);
     cam.addTrauma(0.5);
     cam.update(0.013);
@@ -119,11 +120,11 @@ describe('CameraRig', () => {
     for (let i = 0; i < 200; i++) {
       cam.trauma = 0.5;
       cam.update(0.01);
-      cam.sample(1, 1, out);
+      cam.sample(full, out);
       maxHalf = Math.max(maxHalf, Math.abs(out.x));
     }
     expect(maxHalf).toBeLessThanOrEqual(opts.maxOffset * 0.25 + 1e-9);
-    cam.sample(0, 1, out);
+    cam.sample({ ...full, shake: 0 }, out);
     expect(Math.abs(out.x)).toBe(0);
     expect(Math.abs(out.rotation)).toBe(0);
   });
@@ -143,15 +144,29 @@ describe('CameraRig', () => {
     const cam = new CameraRig(opts);
     cam.pull(0.1, 0.1, 0.5);
     cam.update(0.1);
-    cam.sample(1, 1, out);
+    cam.sample(full, out);
     expect(out.zoom).toBeCloseTo(0.9, 6);
     cam.update(0.6);
-    cam.sample(1, 1, out);
+    cam.sample(full, out);
     expect(out.zoom).toBeCloseTo(1, 6);
     cam.pull(0.1, 0.1, 0.5);
     cam.update(0.1);
-    cam.sample(1, 0.3, out);
+    cam.sample({ ...full, pull: 0.3 }, out);
     expect(out.zoom).toBeCloseTo(0.97, 6);
+  });
+
+  test('ビートの拍動は拍動の倍率だけで決まり、0 なら止まる。揺れと引きの倍率には左右されない', () => {
+    const cam = new CameraRig(opts);
+    cam.beatAmount = 0.012;
+    cam.beatEnvelope = 1;
+    cam.sample(full, out);
+    expect(out.zoom).toBeCloseTo(1.012, 9);
+    cam.sample({ shake: 0, pulse: 1, pull: 0 }, out);
+    expect(out.zoom).toBeCloseTo(1.012, 9);
+    cam.sample({ ...full, pulse: 0.3 }, out);
+    expect(out.zoom).toBeCloseTo(1.0036, 9);
+    cam.sample({ ...full, pulse: 0 }, out);
+    expect(out.zoom).toBe(1);
   });
 });
 

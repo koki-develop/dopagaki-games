@@ -10,6 +10,18 @@ export type CameraOffset = {
   zoom: number;
 };
 
+/**
+ * カメラの動きの種類ごとの倍率（0 で止める、1 でそのまま）。ユーザー設定から決める（SettingsStore.cameraMotion）
+ * - shake: 衝撃による揺れ（trauma）
+ * - pulse: ビートに合わせた拍動
+ * - pull: 大きな節目で引いて戻るズーム
+ */
+export type CameraMotion = {
+  shake: number;
+  pulse: number;
+  pull: number;
+};
+
 type CameraRigOptions = {
   /** trauma 1 のときの最大の平行移動（ワールド単位） */
   maxOffset: number;
@@ -63,12 +75,9 @@ export class CameraRig {
     }
   }
 
-  /**
-   * 現在のカメラのずれ。
-   * shakeScale はユーザー設定と演出の強さを掛けた揺れの倍率、motionScale は引きと拍動の倍率。
-   */
-  sample(shakeScale: number, motionScale: number, out: CameraOffset): CameraOffset {
-    const shake = this.trauma * this.trauma * shakeScale;
+  /** 現在のカメラのずれ。動きの種類ごとに motion の倍率を掛ける */
+  sample(motion: Readonly<CameraMotion>, out: CameraOffset): CameraOffset {
+    const shake = this.trauma * this.trauma * motion.shake;
     const t = this.time * this.opts.frequency;
     out.x = this.opts.maxOffset * shake * this.nx.sample(t);
     out.y = this.opts.maxOffset * shake * this.ny.sample(t + 100);
@@ -79,7 +88,7 @@ export class CameraRig {
       const k = e < p.attack ? easeOutCubic(e / p.attack) : 1 - easeOutCubic((e - p.attack) / p.release);
       pull += p.amount * k;
     }
-    out.zoom = 1 - Math.min(0.35, pull) * motionScale + this.beatAmount * this.beatEnvelope * motionScale;
+    out.zoom = 1 - Math.min(0.35, pull) * motion.pull + this.beatAmount * this.beatEnvelope * motion.pulse;
     return out;
   }
 }

@@ -29,9 +29,32 @@ describe('SettingsStore', () => {
   test('prefers-reduced-motion のときは、画面の揺れの初期値がオフになり、カメラの動きを弱める', () => {
     const s = new SettingsStore(memoryStorage(), fakeMotion(true));
     expect(s.get().shake).toBe(false);
-    expect(s.cameraMotionScale).toBeLessThan(1);
+    expect(s.cameraMotion).toEqual({ shake: 0, pulse: 0, pull: 0.3 });
     expect(new SettingsStore(memoryStorage(), fakeMotion(false)).get().shake).toBe(true);
-    expect(new SettingsStore(memoryStorage(), null).cameraMotionScale).toBe(1);
+    expect(new SettingsStore(memoryStorage(), null).cameraMotion).toEqual({ shake: 1, pulse: 1, pull: 1 });
+  });
+
+  test('画面の揺れをオフにすると、衝撃による揺れとビートの拍動が止まる。引きは止めない', () => {
+    const s = new SettingsStore(memoryStorage(), fakeMotion(false));
+    const motion = s.cameraMotion;
+    expect(motion).toEqual({ shake: 1, pulse: 1, pull: 1 });
+    s.update({ shake: false });
+    expect(s.cameraMotion).toEqual({ shake: 0, pulse: 0, pull: 1 });
+    // 毎フレーム読まれるので、同じオブジェクトの中身を書き換える
+    expect(s.cameraMotion).toBe(motion);
+    s.update({ shake: true });
+    expect(s.cameraMotion).toEqual({ shake: 1, pulse: 1, pull: 1 });
+  });
+
+  test('prefers-reduced-motion で画面の揺れをオンにしたときは、拍動と引きを弱めて残す', () => {
+    const s = new SettingsStore(memoryStorage(), fakeMotion(true));
+    s.update({ shake: true });
+    expect(s.cameraMotion).toEqual({ shake: 1, pulse: 0.3, pull: 0.3 });
+  });
+
+  test('保存済みの「画面の揺れ: オフ」を読み込んだときも、拍動を止める', () => {
+    const s = new SettingsStore(memoryStorage({ 'dopagaki:settings': JSON.stringify({ shake: false, sfx: true, bgm: true }) }), fakeMotion(false));
+    expect(s.cameraMotion).toEqual({ shake: 0, pulse: 0, pull: 1 });
   });
 
   test('prefers-reduced-motion の変化を購読者へ知らせる', () => {
@@ -43,17 +66,17 @@ describe('SettingsStore', () => {
     q.fire(true);
     expect(calls).toBe(1);
     expect(s.reducedMotion).toBe(true);
-    expect(s.cameraMotionScale).toBeLessThan(1);
+    expect(s.cameraMotion).toEqual({ shake: 1, pulse: 0.3, pull: 0.3 });
     q.fire(false);
     expect(calls).toBe(2);
     expect(s.reducedMotion).toBe(false);
-    expect(s.cameraMotionScale).toBe(1);
+    expect(s.cameraMotion).toEqual({ shake: 1, pulse: 1, pull: 1 });
   });
 
   test('prefers-reduced-motion を問い合わせられないときは、動きを減らさない', () => {
     const s = new SettingsStore(memoryStorage(), null);
     expect(s.reducedMotion).toBe(false);
-    expect(s.cameraMotionScale).toBe(1);
+    expect(s.cameraMotion).toEqual({ shake: 1, pulse: 1, pull: 1 });
   });
 
   test('書き込めない（容量が一杯の）ときも、保存済みの値は読める', () => {
