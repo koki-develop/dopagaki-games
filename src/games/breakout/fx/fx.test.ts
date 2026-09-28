@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { IntensityMeter, WATERFALL_ENTER, WATERFALL_EXIT, WaterfallSwitch } from './intensity.ts';
+import { IntensityMeter } from './intensity.ts';
 import { TierTracker } from './tiers.ts';
 
 describe('TierTracker', () => {
@@ -43,15 +43,5 @@ describe('IntensityMeter', () => {
     expect(a.rate).toBeCloseTo(120, 0);
     expect(b.rate).toBeGreaterThan(55);
     expect(b.rate).toBeLessThan(75);
-  });
-});
-
-describe('WaterfallSwitch', () => {
-  test('入る閾値と出る閾値に差を付ける', () => {
-    const s = new WaterfallSwitch();
-    expect(s.update(WATERFALL_ENTER - 1)).toBe(false);
-    expect(s.update(WATERFALL_ENTER)).toBe(true);
-    expect(s.update(WATERFALL_EXIT + 1)).toBe(true);
-    expect(s.update(WATERFALL_EXIT - 0.1)).toBe(false);
   });
 });

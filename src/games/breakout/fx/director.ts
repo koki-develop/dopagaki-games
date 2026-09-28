@@ -115,7 +115,7 @@ export class Director {
     this.onFinished = opts.onFinished;
     this.previousBest = opts.previousBest;
     this.particles = new ParticleFx(ports.particles, ports.debris);
-    this.sounds = new SoundDirector(ports.sfx, () => ports.audio.now());
+    this.sounds = new SoundDirector(ports.sfx);
     this.atmosphere = new Atmosphere(ports.bgm, sim.blocks.liveCount);
     this.newBest = new NewBest(opts.previousBest);
     const vibrate = (pattern: number | readonly number[]): void => ports.vibrate(pattern);

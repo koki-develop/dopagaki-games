@@ -1,14 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import type { FrameTime } from '../frame-time.ts';
 import { FrameSummary } from './aggregate.ts';
-import { IntensityMeter, WATERFALL_ENTER } from './intensity.ts';
-import { SoundDirector, WATERFALL_LOOKAHEAD, WATERFALL_NOTES_PER_SEC } from './sound-director.ts';
+import { IntensityMeter } from './intensity.ts';
+import { BREAK_MIN_INTERVAL, SoundDirector } from './sound-director.ts';
 import { Recorder, recordingSfx } from './test-kit.test-support.ts';
 
 function setup() {
   const rec = new Recorder();
-  let audioTime = 10;
-  const sounds = new SoundDirector(recordingSfx(rec), () => audioTime);
+  const sounds = new SoundDirector(recordingSfx(rec));
   const ft: FrameTime = { realDt: 1 / 60, worldDt: 1 / 60, real: 0, world: 0, present: 0 };
   const s = new FrameSummary();
   const meter = new IntensityMeter();
@@ -18,17 +17,13 @@ function setup() {
     ft,
     s,
     meter,
-    /** dt 秒ぶん進めて 1 フレーム鳴らす。audioDt は AudioContext の時刻の進み */
-    step(dt = 1 / 60, audioDt = dt) {
+    /** dt 秒ぶん進めて 1 フレーム鳴らす */
+    step(dt = 1 / 60) {
       ft.realDt = dt;
       ft.worldDt = dt;
       ft.real += dt;
-      audioTime += audioDt;
       meter.update(s.breaks, s.maxChain, dt);
       sounds.frame(s, meter, ft);
-    },
-    get audioTime() {
-      return audioTime;
     },
   };
 }
@@ -69,38 +64,84 @@ describe('SoundDirector', () => {
     expect(t.rec.of('sfx.megaBurst').map((c) => c.args)).toEqual([[3]]);
   });
 
-  test('破壊ペースが低いうちは 1 フレームに 1 音、高いと音の滝を先の時刻まで予約する', () => {
+  test('破壊音は壊れたフレームでだけ鳴らし、0.04 秒より詰めない。破壊が止まったら次のフレームから鳴らない', () => {
     const t = setup();
-    t.s.breaks = 1;
-    t.s.maxChain = 3;
-    t.step();
-    expect(t.rec.of('sfx.breakNote').map((c) => c.args[0])).toEqual([2]);
     t.s.breaks = 5;
-    for (let i = 0; i < 30; i++) t.step();
-    expect(t.meter.rate).toBeGreaterThan(WATERFALL_ENTER);
-    const notes = t.rec.of('sfx.waterfallNote');
-    expect(notes.length).toBeGreaterThan(5);
-    for (let k = 1; k < notes.length; k++) {
-      expect(notes[k].args[1] as number).toBeCloseTo((notes[k - 1].args[1] as number) + 1 / WATERFALL_NOTES_PER_SEC, 9);
-      expect(notes[k].args[0]).toBe((notes[k - 1].args[0] as number) + 1);
+    t.s.maxChain = 1;
+    let lastAt = -Infinity;
+    for (let i = 0; i < 60; i++) {
+      t.s.maxChain += 5;
+      const before = t.rec.count('sfx.breakNote');
+      t.step();
+      if (t.rec.count('sfx.breakNote') === before) continue;
+      expect(t.ft.real - lastAt).toBeGreaterThanOrEqual(BREAK_MIN_INTERVAL);
+      lastAt = t.ft.real;
     }
-    const last = notes[notes.length - 1].args[1] as number;
-    expect(last).toBeLessThan(t.audioTime + WATERFALL_LOOKAHEAD);
+    const notes = t.rec.of('sfx.breakNote');
+    expect(notes.length).toBeGreaterThan(15);
+    expect(notes.length).toBeLessThanOrEqual(Math.ceil(1 / BREAK_MIN_INTERVAL) + 1);
+    // 間引いた破壊は次の 1 音にまとめる。最後の 1 音の後に壊れた分だけが残る
+    const merged = notes.reduce((sum, c) => sum + (c.args[1] as number), 0);
+    expect(merged).toBeLessThanOrEqual(300);
+    expect(merged).toBeGreaterThan(300 - 5 * Math.ceil(BREAK_MIN_INTERVAL * 60));
+    t.s.breaks = 0;
+    for (let i = 0; i < 60; i++) t.step();
+    expect(t.rec.count('sfx.breakNote')).toBe(notes.length);
   });
 
-  test('長いフレームでは 1.5 フレームぶん先まで予約し、止まっていた分は過去に並べない', () => {
+  test('最短間隔の途中で途切れた破壊は、後から鳴らさない', () => {
     const t = setup();
-    t.s.breaks = 5;
-    for (let i = 0; i < 30; i++) t.step();
-    const before = t.rec.count('sfx.waterfallNote');
-    // 0.5 秒止まってから、長いフレーム
-    t.step(0.1, 0.6);
-    const fresh = t.rec.of('sfx.waterfallNote').slice(before);
-    expect(fresh.length).toBeGreaterThan(0);
-    for (const c of fresh) expect(c.args[1] as number).toBeGreaterThanOrEqual(t.audioTime);
-    const last = fresh[fresh.length - 1].args[1] as number;
-    expect(last).toBeGreaterThanOrEqual(t.audioTime + 0.15 - 1 / WATERFALL_NOTES_PER_SEC);
-    expect(last).toBeLessThan(t.audioTime + 0.15);
+    t.s.maxChain = 1;
+    t.s.breaks = 1;
+    t.step();
+    t.step();
+    expect(t.rec.count('sfx.breakNote')).toBe(1);
+    t.s.breaks = 0;
+    for (let i = 0; i < 10; i++) t.step();
+    expect(t.rec.count('sfx.breakNote')).toBe(1);
+    // 次に壊れたときも、途切れた分をまとめない
+    t.s.breaks = 1;
+    t.step();
+    expect(t.rec.of('sfx.breakNote').map((c) => c.args[1])).toEqual([1, 1]);
+  });
+
+  test('音程は 1 音ごとに 1 つ上がり、chain より先へは進まない。chain が切れたら戻る', () => {
+    const t = setup();
+    // ゆっくり壊すと、音程は chain と同じ高さ
+    t.s.breaks = 1;
+    for (let chain = 1; chain <= 4; chain++) {
+      t.s.maxChain = chain;
+      t.step(0.1);
+    }
+    expect(t.rec.of('sfx.breakNote').map((c) => c.args[0])).toEqual([0, 1, 2, 3]);
+    // 速く壊すと、chain が先へ進んでも 1 音に 1 つずつ上がる
+    t.s.breaks = 8;
+    for (let i = 0; i < 30; i++) {
+      t.s.maxChain += 8;
+      t.step();
+    }
+    const fast = t.rec.of('sfx.breakNote').slice(4).map((c) => c.args[0] as number);
+    expect(fast.length).toBeGreaterThan(5);
+    for (let k = 0; k < fast.length; k++) expect(fast[k]).toBe(4 + k);
+    // chain が切れると、新しい chain の高さへ戻る
+    t.s.breaks = 1;
+    t.s.maxChain = 1;
+    t.step(0.1);
+    expect(t.rec.of('sfx.breakNote').at(-1)!.args[0]).toBe(0);
+  });
+
+  test('破壊ペースが上がるほど、1 音を小さくする', () => {
+    const t = setup();
+    t.s.maxChain = 1;
+    t.s.breaks = 1;
+    t.step(0.5);
+    const calm = t.rec.of('sfx.breakNote').at(-1)!.args[3] as number;
+    t.s.breaks = 8;
+    for (let i = 0; i < 60; i++) t.step();
+    const busy = t.rec.of('sfx.breakNote').at(-1)!.args[3] as number;
+    expect(calm).toBeLessThanOrEqual(1);
+    expect(busy).toBeLessThan(calm);
+    expect(busy).toBeGreaterThanOrEqual(0.5);
   });
 
   test('quiesce の後は何も鳴らさない', () => {

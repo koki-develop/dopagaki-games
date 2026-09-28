@@ -17,9 +17,9 @@ function setup() {
 const NODES_PER_CALL: [string, (s: BreakoutSfx) => void, number][] = [
   ['paddle', (s) => s.paddle(1, 1), 8],
   ['hardHit', (s) => s.hardHit(0.5, 1), 10],
-  ['breakNote (count 1)', (s) => s.breakNote(3, 1, 0.5), 6],
-  ['breakNote (count 3)', (s) => s.breakNote(3, 3, 0.5), 8],
-  ['waterfallNote', (s) => s.waterfallNote(3, 0, 1, 0.8), 3],
+  ['breakNote (count 1)', (s) => s.breakNote(3, 1, 0.5, 1), 6],
+  ['breakNote (count 3)', (s) => s.breakNote(3, 3, 0.5, 1), 8],
+  ['breakNote (count 3, brightness 1)', (s) => s.breakNote(3, 3, 1, 1), 6],
   ['bonusNote', (s) => s.bonusNote(3, 1), 5],
   ['megaBurst', (s) => s.megaBurst(2), 10],
   ['ballsZero', (s) => s.ballsZero(), 8],
@@ -46,7 +46,7 @@ describe('BreakoutSfx', () => {
     for (let step = 0; step < 40; step++) {
       ctx.resetCounts();
       const before = ctx.sources.length;
-      sfx.waterfallNote(step, 0, 1, step % 2 === 0 ? 0.2 : 0.9);
+      sfx.breakNote(step, 1, step % 2 === 0 ? 0.2 : 0.9, 1);
       expect(ctx.created.oscillator).toBe(1);
       const osc = ctx.sources[before];
       expect(osc.type).toBe('custom');
@@ -89,7 +89,7 @@ describe('BreakoutSfx', () => {
     const { ctx, group, sfx } = setup();
     sfx.resolveChord();
     sfx.inhale(0.3);
-    sfx.waterfallNote(1, 0.5, 1, 0.5);
+    sfx.breakNote(1, 3, 0.5, 1);
     expect(group.size).toBe(3);
     ctx.currentTime = 0.1;
     group.stopAll(0.03);

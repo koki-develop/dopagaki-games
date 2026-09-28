@@ -13,7 +13,7 @@ import { GAME_OVER_FINISH } from './game-over.ts';
 import { clearingSim, Harness, losingSim } from './test-kit.test-support.ts';
 
 /** 大量に起きる（勝敗が決まったら止める）音 */
-const STREAM_SOUNDS = ['sfx.paddle', 'sfx.hardHit', 'sfx.breakNote', 'sfx.waterfallNote', 'sfx.megaBurst'];
+const STREAM_SOUNDS = ['sfx.paddle', 'sfx.hardHit', 'sfx.breakNote', 'sfx.megaBurst'];
 
 /** 1 フレームに n 個の破壊をイベント列へ足す */
 function injectBreaks(n: number, type: number = BlockType.Ball) {
@@ -115,11 +115,11 @@ describe('ライフサイクル', () => {
 });
 
 describe('音を止める', () => {
-  test('音の滝は勝敗が決まったら止まる（ゲームオーバーのスローモーション中も鳴らない）', () => {
+  test('破壊音は勝敗が決まったら止まる（ゲームオーバーのスローモーション中も鳴らない）', () => {
     const h = new Harness({ sim: losingSim() });
     h.beforeDirector = injectBreaks(6);
     h.run(60);
-    expect(h.rec.count('sfx.waterfallNote')).toBeGreaterThan(20);
+    expect(h.rec.count('sfx.breakNote')).toBeGreaterThan(10);
     h.beforeDirector = null;
     dropAllBalls(h.sim);
     h.frame();
@@ -131,7 +131,7 @@ describe('音を止める', () => {
     expect(h.rec.count('sfx.gameOver')).toBe(1);
   });
 
-  test('音の滝はフィナーレが始まったら止まる', () => {
+  test('破壊音はフィナーレが始まったら止まる', () => {
     const h = new Harness({ sim: clearingSim(20) });
     h.beforeDirector = injectBreaks(6);
     h.until(() => h.ended, 600);

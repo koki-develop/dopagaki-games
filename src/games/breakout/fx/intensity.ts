@@ -29,17 +29,3 @@ export class IntensityMeter {
     this.intensity = clamp01(0.75 * r + 0.25 * c);
   }
 }
-
-/** 破壊ペースがこれを超えたら音の滝に切り替え、下回ったら個別の音に戻す（個 / 秒） */
-export const WATERFALL_ENTER = 14;
-export const WATERFALL_EXIT = 7;
-
-export class WaterfallSwitch {
-  on = false;
-
-  update(rate: number): boolean {
-    if (!this.on && rate >= WATERFALL_ENTER) this.on = true;
-    else if (this.on && rate < WATERFALL_EXIT) this.on = false;
-    return this.on;
-  }
-}

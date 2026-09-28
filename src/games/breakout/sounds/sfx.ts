@@ -9,6 +9,11 @@ const SHEPARD_COMPONENTS = 4;
 const SHEPARD_JITTER = 8;
 /** 音の出だしの長さ（秒） */
 const PLUCK_ATTACK = 0.002;
+/** 破壊音の減衰の長さ（秒）。演出の強さが 0 のときと 1 のとき */
+const BREAK_DECAY_CALM = 0.3;
+const BREAK_DECAY_BUSY = 0.16;
+/** 破壊音の低音の塊は、ピークがこれより小さければ鳴らさない */
+const BREAK_THUMP_MIN = 0.02;
 
 /** ボール大量ブロックの和音の、ペンタトニックでの構成（step からの距離） */
 const MEGA_CHORD = [0, 2, 4] as const;
@@ -39,7 +44,7 @@ export class BreakoutSfx {
 
   constructor(engine: AudioEngine, group: VoiceGroup) {
     this.e = engine;
-    this.req = { bus: 'sfx', duration: 0, gain: 1, when: 0, priority: 'normal', group };
+    this.req = { bus: 'sfx', duration: 0, gain: 1, priority: 'normal', group };
   }
 
   /** パドルで打つ: 低い打撃音 + クリック */
@@ -68,27 +73,21 @@ export class BreakoutSfx {
   }
 
   /**
-   * ブロックを壊す: chain に沿ってペンタトニックで上がる Shepard tone。
-   * count は同じフレームでまとめた破壊数で、音量と厚みを log スケールで増やす。
+   * ブロックを壊す: ペンタトニックで上がる Shepard tone とクリック。
+   * count はこの 1 音にまとめた破壊数で、音量と厚みを log スケールで増やす。gain は間引きによる 1 音の音量。
+   * brightness（演出の強さ）が上がるほど音を短く明るくし、低音の塊を減らして、速く続けて鳴っても濁らないようにする。
    */
-  breakNote(step: number, count: number, brightness: number): void {
+  breakNote(step: number, count: number, brightness: number, gain: number): void {
     const thick = Math.log2(1 + count);
-    const v = this.open(0.34, Math.min(1.5, 0.5 + 0.28 * thick));
+    const decay = BREAK_DECAY_CALM + (BREAK_DECAY_BUSY - BREAK_DECAY_CALM) * brightness;
+    const v = this.open(decay + 0.04, Math.min(1.5, 0.5 + 0.28 * thick) * gain);
     if (!v) return;
     const t = v.start;
-    this.shepardPluck(v, t, step, 0.3, 0.2, brightness);
+    this.shepardPluck(v, t, step, decay, 0.2, brightness);
     noise(v, t, 'bandpass', rand(1800, 2600) + 800 * brightness, 1.2, 0.001, 0.028 + 0.01 * thick, 0.3, Math.random());
-    if (count >= 3) {
-      // まとめて壊れたときは、低音の塊を足して重さを出す
-      glide(tone(v, t, 'sine', 90, 0.002, 0.16, Math.min(0.5, 0.12 * thick)).frequency, 45, t + 0.12);
-    }
-  }
-
-  /** 音の滝の 1 音。短く明るい。when は鳴らす AudioContext の時刻 */
-  waterfallNote(step: number, when: number, gain: number, brightness: number): void {
-    const v = this.open(0.2, gain, when);
-    if (!v) return;
-    this.shepardPluck(v, v.start, step, 0.16, 0.18, brightness);
+    // まとめて壊れたときは、低音の塊を足して重さを出す
+    const thump = count >= 3 ? Math.min(0.5, 0.12 * thick) * (1 - brightness) : 0;
+    if (thump >= BREAK_THUMP_MIN) glide(tone(v, t, 'sine', 90, 0.002, 0.16, thump).frequency, 45, t + 0.12);
   }
 
   /** ボール大量ブロック: くす玉が弾けるような和音と破裂音 */
@@ -107,7 +106,7 @@ export class BreakoutSfx {
 
   /** ボールが 0 個になった: 重い低音 */
   ballsZero(): void {
-    const v = this.open(1.3, 1, 0, 'event');
+    const v = this.open(1.3, 1, 'event');
     if (!v) return;
     const t = v.start;
     glide(tone(v, t, 'sine', 72, 0.01, 1.2, 0.9).frequency, 26, t + 1.0);
@@ -117,7 +116,7 @@ export class BreakoutSfx {
 
   /** ペナルティで降りてきたブロックが着地した: 叩きつける音 */
   slam(): void {
-    const v = this.open(0.6, 1, 0, 'event');
+    const v = this.open(0.6, 1, 'event');
     if (!v) return;
     const t = v.start;
     glide(noise(v, t, 'lowpass', 1400, DEFAULT_Q, 0.001, 0.45, 0.8, Math.random()).frequency, 110, t + 0.451);
@@ -137,7 +136,7 @@ export class BreakoutSfx {
 
   /** ゲームオーバー: 下がっていく暗い音 */
   gameOver(): void {
-    const v = this.open(2.2, 0.8, 0, 'event');
+    const v = this.open(2.2, 0.8, 'event');
     if (!v) return;
     const ctx = v.ctx;
     const t = v.start;
@@ -164,7 +163,7 @@ export class BreakoutSfx {
    */
   peakChord(level: number): void {
     const dur = 1.6 + level * 0.3;
-    const v = this.open(dur + 0.2, 0.75, 0, 'event');
+    const v = this.open(dur + 0.2, 0.75, 'event');
     if (!v) return;
     const t = v.start;
     const count = Math.min(PEAK_VOICING.length, 5 + level * 2);
@@ -178,7 +177,7 @@ export class BreakoutSfx {
    * 他の音は消えている間に鳴らすので、無音を通らない lead の経路で鳴らす。
    */
   inhale(duration: number): void {
-    const v = this.open(duration + 0.02, 0.9, 0, 'event', 'lead');
+    const v = this.open(duration + 0.02, 0.9, 'event', 'lead');
     if (!v) return;
     const ctx = v.ctx;
     const t = v.start;
@@ -208,7 +207,7 @@ export class BreakoutSfx {
 
   /** ステージクリアの炸裂: 音域全体に広がる和音と破裂音 */
   finaleBurst(): void {
-    const v = this.open(3.2, 0.85, 0, 'event');
+    const v = this.open(3.2, 0.85, 'event');
     if (!v) return;
     const t = v.start;
     this.supersaw(v, t, FINALE_CHORD, FINALE_CHORD.length, 2.8, 0.004, 6000);
@@ -228,19 +227,18 @@ export class BreakoutSfx {
 
   /** フィナーレの最後に解決する和音（C メジャー 9） */
   resolveChord(): void {
-    const v = this.open(3.6, 0.7, 0, 'event');
+    const v = this.open(3.6, 0.7, 'event');
     if (!v) return;
     const t = v.start;
     this.supersaw(v, t, RESOLVE_CHORD, RESOLVE_CHORD.length, 3.3, 0.05, 3200);
     tone(v, t, 'sine', 65.41, 0.02, 3.2, 0.6);
   }
 
-  private open(duration: number, gain: number, when = 0, priority: VoicePriority = 'normal', bus: Bus = 'sfx'): Voice | null {
+  private open(duration: number, gain: number, priority: VoicePriority = 'normal', bus: Bus = 'sfx'): Voice | null {
     const r = this.req;
     r.bus = bus;
     r.duration = duration;
     r.gain = gain;
-    r.when = when;
     r.priority = priority;
     return this.e.voice(r);
   }

@@ -26,7 +26,6 @@ const SFX_METHODS = [
   'paddle',
   'hardHit',
   'breakNote',
-  'waterfallNote',
   'megaBurst',
   'ballsZero',
   'slam',

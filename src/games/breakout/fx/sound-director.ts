@@ -3,7 +3,6 @@ import type { FrameTime } from '../frame-time.ts';
 import type { BreakoutSfx } from '../sounds/sfx.ts';
 import type { FrameSummary } from './aggregate.ts';
 import type { IntensityMeter } from './intensity.ts';
-import { WaterfallSwitch } from './intensity.ts';
 
 /** 演出から鳴らす効果音。BreakoutSfx がそのまま当てはまる */
 export type SfxPort = Pick<
@@ -11,7 +10,6 @@ export type SfxPort = Pick<
   | 'paddle'
   | 'hardHit'
   | 'breakNote'
-  | 'waterfallNote'
   | 'megaBurst'
   | 'ballsZero'
   | 'slam'
@@ -24,41 +22,36 @@ export type SfxPort = Pick<
   | 'resolveChord'
 >;
 
-/** 音の滝の 1 秒あたりの音数 */
-export const WATERFALL_NOTES_PER_SEC = 22;
-/** 音の滝を先に予約しておく長さの下限（秒）。フレームが長いときは 1.5 フレームぶんまで延ばす */
-export const WATERFALL_LOOKAHEAD = 0.1;
+/** 破壊音を鳴らす最短の間隔（秒） */
+export const BREAK_MIN_INTERVAL = 0.04;
 /** フィナーレの届く音が 1 周する音数 */
 const BONUS_STEPS = 40;
 
 /**
- * 1 フレームぶんのイベントの集計から、大量に起きる音（パドル・ハード・破壊・音の滝・ボール大量ブロック）を鳴らす。
- * パドル・ハード・フィナーレの届く音は間引いてまとめ、ボール大量ブロックの音は 1 フレームに 1 回にする。
+ * 1 フレームぶんのイベントの集計から、大量に起きる音（パドル・ハード・破壊・ボール大量ブロック）を鳴らす。
+ * パドル・ハード・破壊・フィナーレの届く音は間引いてまとめ、ボール大量ブロックの音は 1 フレームに 1 回にする。
+ * どの音も、それを起こしたイベントがあったフレームでだけ鳴らす。
  * 勝敗が決まったら quiesce() で止め、それ以降は大量に起きる音を鳴らさない。
  */
 export class SoundDirector {
   private readonly sfx: SfxPort;
-  private readonly audioNow: () => number;
   private readonly paddleThrottle = new SoundThrottle({ minInterval: 0.08, rateTau: 0.5, halfGainRate: 12, minGain: 0.3 });
   private readonly hardThrottle = new SoundThrottle({ minInterval: 0.05, rateTau: 0.5, halfGainRate: 15, minGain: 0.35 });
+  private readonly breakThrottle = new SoundThrottle({ minInterval: BREAK_MIN_INTERVAL, rateTau: 0.35, halfGainRate: 250, minGain: 0.5 });
   private readonly bonusThrottle = new SoundThrottle({ minInterval: 0.04, rateTau: 0.3, halfGainRate: 25, minGain: 0.5 });
-  private readonly waterfall = new WaterfallSwitch();
-  private waterfallNext = 0;
-  private waterfallStep = 0;
+  /** 直前に鳴らした破壊音の音階の位置。chain が続く間は 1 音ごとに 1 つ上がる */
+  private breakStep = -1;
   /** まだ鳴らしていないハードの当たりのうち、残り HP の割合の最小値 */
   private hardPendingRatio = 1;
   private quiet = false;
 
-  /** audioNow は AudioContext の時刻（音の予約に使う） */
-  constructor(sfx: SfxPort, audioNow: () => number) {
+  constructor(sfx: SfxPort) {
     this.sfx = sfx;
-    this.audioNow = audioNow;
   }
 
-  /** 以後、frame() では何も鳴らさない。予約済みの音の滝も、これより先の分は予約しない */
+  /** 以後、frame() では何も鳴らさない */
   quiesce(): void {
     this.quiet = true;
-    this.waterfall.on = false;
   }
 
   /** 1 フレームぶんの音。meter はこのフレームの破壊数で更新した後のもの */
@@ -77,22 +70,12 @@ export class SoundDirector {
       this.hardPendingRatio = 1;
     }
 
-    if (this.waterfall.update(meter.rate)) {
-      const t = this.audioNow();
-      if (this.waterfallNext < t) {
-        // 途切れていた（またはフレームが止まっていた）ときは、過ぎた分をまとめて鳴らさず、今から並べ直す
-        this.waterfallNext = t;
-        this.waterfallStep = Math.max(this.waterfallStep, s.maxChain - 1);
-      }
-      const gain = Math.min(1.2, 0.35 + 0.18 * Math.log2(1 + meter.rate / 10));
-      const until = t + Math.max(WATERFALL_LOOKAHEAD, 1.5 * ft.realDt);
-      while (this.waterfallNext < until) {
-        sfx.waterfallNote(this.waterfallStep++, this.waterfallNext, gain, meter.intensity);
-        this.waterfallNext += 1 / WATERFALL_NOTES_PER_SEC;
-      }
-    } else if (s.breaks > 0) {
-      sfx.breakNote(Math.max(0, s.maxChain - 1), s.breaks, meter.intensity);
-      this.waterfallStep = s.maxChain;
+    // 破壊音: 1 音ごとに音階を 1 つ上げる。chain より先には進めないので、1 音が 1 回の破壊のときは chain と同じ高さになり、
+    // chain が切れたら低い音へ戻る
+    const breaks = this.breakThrottle.update(ft.real, ft.realDt, s.breaks);
+    if (breaks > 0) {
+      this.breakStep = Math.min(this.breakStep + 1, Math.max(0, s.maxChain - 1));
+      sfx.breakNote(this.breakStep, breaks, meter.intensity, this.breakThrottle.gain);
     }
 
     if (s.megaCount > 0) sfx.megaBurst(Math.max(0, s.megaChain - 1));
