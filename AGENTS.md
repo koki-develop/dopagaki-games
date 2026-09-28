@@ -24,12 +24,20 @@
 - `src/juice/`: 手触りの部品（Web Audio のエンジン、カメラの揺れ、時間の流れ、明滅の制限、振動、設定の保存）
 - `src/games/<ゲーム名>/`: ゲーム本体
 - `src/app/`: React の画面（ポータルと各ゲームの UI）とスタイル
+- `build/`: Vite のプラグイン（`build/site/plugin.ts`）。ページごとの HTML（題名・説明・canonical・OGP）、OG 画像、アイコン、`sitemap.xml`、`robots.txt` を作る。Node で動く
 
-依存は `shared` ← `juice` ← `games` ← `app`、`engine` ← `games` の向きだけにする。逆向きに import すると、下の層を単体で試せなくなる。
+依存は `shared` ← `juice` ← `games` ← `app`、`engine` ← `games` の向きだけにする。逆向きに import すると、下の層を単体で試せなくなる。`build/` は `src/` を読んでよいが、読むのはブラウザの機能も React も three.js も使わないモジュール（`src/app/site.ts` やゲームの素の値）だけにする。
 
 three.js を import してよいのは `src/engine/` と、各ゲームの `view/` だけ。描画の都合をそこに閉じ込め、ゲームのロジック（状態の管理、シミュレーション、演出の計算、記録など）は three.js を知らない素の値でやり取りする。
 
 `src/app/` 以外で DOM や `window`、`localStorage`、`AudioContext` などのブラウザの機能を使うときは、引数やインターフェース（port）で外から受け取るか、存在を確かめてから使う。`bun test` には DOM がないので、こうしておくとモジュールを読み込めて、偽物を渡して試せる。
+
+## ページと URL
+
+- ページのパス・題名・説明は `src/app/site.ts` にまとめ、画面の切り替え（`src/app/router.ts`）とビルドの両方がそこを読む。ゲームを足すときは、`GAMES` と、OG 画像の `build/og/cards.ts` に足す
+- サイト内のリンクは `src/app/ui/Link.tsx` を使う。ページを読み込み直さずに画面を切り替える
+- 本番は Vercel で、`vercel.json` の `cleanUrls` と `trailingSlash: false` により、末尾のスラッシュや `.html` の付いた URL をリダイレクトする。どのページにも当たらないパスには `404.html` をステータス 404 で返す。開発サーバーとプレビューも、同じ規則で返す（`build/site/resolve.ts`）
+- OG 画像は、satori で描いた文字だけの画像を sharp で PNG にする。ファイル名には中身のハッシュが入り、描き方を変えると URL も変わる
 
 ## コードの書き方
 
