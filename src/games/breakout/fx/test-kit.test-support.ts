@@ -104,6 +104,9 @@ class FakeAudio implements FinaleAudio {
 }
 
 /** 粒や破片を受け取り、数と、渡された発生条件のオブジェクトの種類を数える */
+/** 奈落に落ちたボールとして渡されたもの */
+export type FallenBall = { at: number; x: number; y: number; vx: number; vy: number };
+
 export class CountingSink<T extends object> {
   count = 0;
   readonly specs = new Set<T>();
@@ -169,6 +172,7 @@ export class Harness {
   readonly bgm: BgmPort & { beat: number };
   readonly particles = new CountingSink<ParticleSpec>();
   readonly debris = new CountingSink<DebrisSpec>();
+  readonly fallenBalls: FallenBall[] = [];
   readonly flashes: FlashLimiter;
   readonly director: Director;
   readonly vibrations: (number | readonly number[])[] = [];
@@ -201,6 +205,7 @@ export class Harness {
       audio: this.audio,
       particles: this.particles,
       debris: this.debris,
+      fallenBalls: { emit: (at, x, y, vx, vy) => this.fallenBalls.push({ at, x, y, vx, vy }) },
       flashes: this.flashes,
       vibrate: (p) => {
         this.vibrations.push(p);

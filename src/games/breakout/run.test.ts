@@ -18,6 +18,7 @@ const services = (inputNow = () => 0): RunServices => {
     flashes: new FlashLimiter(3, 1),
     particles: { emit: () => {} },
     debris: { emit: () => {} },
+    fallenBalls: { emit: () => {} },
     vibrate: () => {},
     inputNow,
   };

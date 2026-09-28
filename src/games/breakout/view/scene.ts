@@ -7,7 +7,8 @@ import { WALL_HIT_SLOTS } from '../fx/fx-state.ts';
 import type { FxState } from '../fx/fx-state.ts';
 import type { Sim } from '../sim/sim.ts';
 import { BackgroundView } from './background.ts';
-import { BallsView } from './balls.ts';
+import { BallsView, createBallLook, FallenBallsView } from './balls.ts';
+import type { BallLook } from './balls.ts';
 import { BlocksView } from './blocks.ts';
 import { DebrisView } from './debris.ts';
 import { FlashView } from './flash.ts';
@@ -20,8 +21,16 @@ import { VignetteView } from './vignette.ts';
 import type { ViewUniforms } from './uniforms.ts';
 
 const PARTICLE_CAPACITY = 6000;
-/** 破片は奈落へ落ちきるまで最長 1.8 秒ほど飛ぶ。1 秒あたり約 2200 個までなら、飛んでいる途中で上書きされない */
+/**
+ * 破片は画面の外へ落ちるまで描く。フィールドの下端から 10 下まで落ちるのに最長 2.1 秒ほどかかるので、
+ * 1 秒あたり約 1900 個までなら、そこまでに上書きされない
+ */
 const DEBRIS_CAPACITY = 4096;
+/**
+ * 奈落に落ちたボール。最も浅い角度（水平から 15 度、最低の速さ）で落ちたボールは、フィールドの下端から 10 下まで
+ * 進むのに 4.3 秒ほどかかるので、1 秒あたり約 470 個までなら、そこまでに上書きされない
+ */
+const FALLEN_BALL_CAPACITY = 2048;
 
 /** bloom の強さを受け取る先。本番では PostChain */
 export type BloomTarget = Pick<PostChain, 'setBloom'>;
@@ -34,7 +43,7 @@ export type SceneSource = {
 
 /**
  * ブロック崩しの描画一式。orthographic カメラで、フィールドを 2.5D の平面として描く。
- * 描画順: 背景 → 破片 → ブロック → パーティクル → ボール → パドル → ビネット → フラッシュ
+ * 描画順: 背景 → 破片 → ブロック → パーティクル → ボール（奈落に落ちたボールも） → パドル → ビネット → フラッシュ
  *
  * 1 フレームの書き出しは `apply(fx, ft)`（uniform・bloom・パドルの変形）→ `sync(...)`（インスタンスとカメラ）の順。
  * uniform を書くのは apply だけで、毎フレーム FxState の全部の値を写すので、前のプレイの値は残りようがない。
@@ -45,7 +54,9 @@ export class BreakoutView {
   readonly uniforms: ViewUniforms = createViewUniforms();
   readonly background: BackgroundView;
   readonly blocks: BlocksView;
+  readonly ballLook: BallLook = createBallLook();
   readonly balls: BallsView;
+  readonly fallenBalls: FallenBallsView;
   readonly paddle: PaddleView;
   readonly particles: ParticlesView;
   readonly debris: DebrisView;
@@ -62,11 +73,12 @@ export class BreakoutView {
     this.debris = new DebrisView(u, DEBRIS_CAPACITY);
     this.blocks = new BlocksView(u);
     this.particles = new ParticlesView(u, PARTICLE_CAPACITY);
-    this.balls = new BallsView(u);
+    this.balls = new BallsView(u, this.ballLook);
+    this.fallenBalls = new FallenBallsView(u, this.ballLook, FALLEN_BALL_CAPACITY);
     this.paddle = new PaddleView(u);
     this.flash = new FlashView(u);
     this.vignette = new VignetteView(u);
-    for (const m of [this.background, this.debris, this.blocks, this.particles, this.balls, this.paddle, this.vignette, this.flash]) this.scene.add(m.mesh);
+    for (const m of [this.background, this.debris, this.blocks, this.particles, this.fallenBalls, this.balls, this.paddle, this.vignette, this.flash]) this.scene.add(m.mesh);
     this.camera.position.set(FIELD_W / 2, FIELD_H / 2, 5);
   }
 
@@ -86,10 +98,11 @@ export class BreakoutView {
     this.debris.setBudget(budget);
   }
 
-  /** プレイが切り替わった。飛んでいる粒と破片、ボールの密度の記録を消す */
+  /** プレイが切り替わった。飛んでいる粒と破片、奈落に落ちたボール、ボールの密度の記録を消す */
   clearTransient(): void {
     this.particles.clear();
     this.debris.clear();
+    this.fallenBalls.clear();
     this.background.resetDensity();
   }
 
@@ -145,9 +158,10 @@ export class BreakoutView {
     this.blocks.update(sim.blocks, src.presentOffset);
     const attached = sim.attached && sim.phase === 'playing';
     this.balls.update(sim.balls, alpha, attached ? paddleX : Number.NaN, sim.attachedBallY);
-    this.balls.stretch.value = 0.08 * (sim.speed / cfg.ball.speedStart);
+    this.ballLook.stretch.value = 0.08 * (sim.speed / cfg.ball.speedStart);
     // 50 個までは 1、上限（500 個）で約 0.45
-    this.balls.brightness.value = 1 / Math.sqrt(1 + Math.max(0, sim.ballCount - 50) / 115);
+    this.ballLook.brightness.value = 1 / Math.sqrt(1 + Math.max(0, sim.ballCount - 50) / 115);
+    this.fallenBalls.flush();
     this.particles.flush();
     this.debris.flush();
 
@@ -185,6 +199,7 @@ export class BreakoutView {
     this.background.dispose();
     this.blocks.dispose();
     this.balls.dispose();
+    this.fallenBalls.dispose();
     this.paddle.dispose();
     this.particles.dispose();
     this.debris.dispose();

@@ -207,8 +207,9 @@ export class Sim {
    */
   step(input: SimInput): void {
     if (this.idle) return;
-    if (input.launch) this.launch();
     const dt = STEP_DT;
+    this.events.time = this._time + dt;
+    if (input.launch) this.launch();
     this._time += dt;
     const tx = input.paddleTargetX;
     if (Number.isFinite(tx)) this.paddleTargetX = clamp(tx, this.paddleMin, this.paddleMax);
@@ -387,6 +388,10 @@ export class Sim {
         if (b.y[i] < -R) {
           b.dead[i] = 1;
           anyDead = true;
+          // イベントの時刻（ステップの終わり）の位置にそろえるため、残りのサブステップぶん進めた位置で知らせる
+          const rest = (sub - s - 1) * h;
+          const v = this._speed;
+          this.events.push(EventKind.Drain, b.x[i] + b.dx[i] * rest, b.y[i] + b.dy[i] * rest, b.dx[i] * v, b.dy[i] * v);
           break;
         }
       }

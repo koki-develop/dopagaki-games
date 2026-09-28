@@ -31,6 +31,7 @@ export type RunServices = {
   flashes: FlashLimiter;
   particles: DirectorPorts['particles'];
   debris: DirectorPorts['debris'];
+  fallenBalls: DirectorPorts['fallenBalls'];
   vibrate: DirectorPorts['vibrate'];
   /** 今の時刻（秒）。入力の押した時刻（ReleaseInfo.pressedAt）と同じ時間軸 */
   inputNow(): number;
@@ -121,6 +122,7 @@ export class Run implements SceneSource {
         audio: services.audio,
         particles: services.particles,
         debris: services.debris,
+        fallenBalls: services.fallenBalls,
         flashes: services.flashes,
         vibrate: services.vibrate,
       },

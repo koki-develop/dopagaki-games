@@ -88,7 +88,7 @@ export class BackgroundView {
     const tex = this.densityTex;
     const colorNode = Fn(() => {
       const p = positionWorld.xy.toVar();
-      // 左右の壁の間で天井より下。フィールドの下端より下も、奈落の続きとしてフィールドと同じに描く
+      // 左右の壁の間で天井より下。フィールドの下端より下も、グリッドはフィールドと同じに描く
       const inWalls = step(0, p.x).mul(step(p.x, FIELD_W)).mul(step(p.y, FIELD_H)).toVar();
       const inField = inWalls.mul(step(0, p.y)).toVar();
 
@@ -126,7 +126,8 @@ export class BackgroundView {
       If(this.tint.notEqual(0), () => {
         base.addAssign(neon(hueT.add(0.3)).mul(this.tint));
       });
-      const pit = smoothstep(PIT_TOP, 0, p.y).mul(inWalls);
+      // 奈落の暗がりは、壁の外も含めた画面の横幅いっぱいに、フィールドの下端より下まで続ける
+      const pit = smoothstep(PIT_TOP, 0, p.y);
       const col = base.mul(float(1).sub(pit.mul(0.6))).toVar();
       // 線から離れた画素では線の重みがちょうど 0 で、足しても値が変わらないので計算しない。
       // 太い線（g が 4 の倍数）は細い線（g が整数）と重なるので、太い線までの距離は細い線までの距離以上で fm ≥ f。

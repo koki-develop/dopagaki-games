@@ -16,6 +16,15 @@ describe('EventQueue', () => {
     expect(Array.from(q.counts)).toEqual(new Array(EVENT_KIND_COUNT).fill(0));
   });
 
+  test('積んだイベントには、積んだときの time を残す', () => {
+    const q = new EventQueue(4);
+    q.time = 0.5;
+    q.push(EventKind.WallHit, 0, 0, -1, 0);
+    q.time = 0.75;
+    q.push(EventKind.Drain, 1, -0.2, 0, -9);
+    expect(Array.from(q.t.subarray(0, 2))).toEqual([0.5, 0.75]);
+  });
+
   test('信号はビットで溜まり、位置を伴う信号だけが位置を書く', () => {
     const q = new EventQueue(4);
     q.signal(Signal.BallsZero);

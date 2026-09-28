@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { FlashLimiter } from '../../../juice/flash.ts';
-import { BlockType, tuning } from '../config.ts';
+import { BlockType, STEP_DT, tuning } from '../config.ts';
 import { EventKind } from '../sim/events.ts';
 import { cellCenterX } from '../sim/blocks.ts';
 import { Sim } from '../sim/sim.ts';
@@ -524,5 +524,48 @@ describe('割り当て', () => {
     h.frame();
     expect(h.particles.times.length).toBeGreaterThan(0);
     for (const t of h.particles.times) expect(t).toBe(h.ft.present);
+  });
+});
+
+describe('奈落に落ちたボール', () => {
+  test('落ちたボールは、生きていたときに描いていた位置から続けて進む', () => {
+    const sim = new Sim({ mode: stageMode([line(0, 'o')]), seed: 1, config: simConfig() });
+    const h = new Harness({ sim, presentOffset: 1000 });
+    h.frame();
+    const [dx, dy] = [0.6, -0.8];
+    placeBall(sim, 5, 1.2, dx, dy);
+    // 生きている間に描いた位置（1 つ前と今の固定ステップの間の補間）と、そのときの present
+    let drawnX = 0;
+    let drawnY = 0;
+    let drawnAt = 0;
+    let speed = 0;
+    while (sim.ballCount > 0) {
+      speed = sim.speed;
+      const b = sim.balls;
+      const alpha = (h.ft.world - sim.time) / STEP_DT;
+      drawnX = b.px[0] + (b.x[0] - b.px[0]) * alpha;
+      drawnY = b.py[0] + (b.y[0] - b.py[0]) * alpha;
+      drawnAt = h.ft.present;
+      h.frame(1 / 45);
+    }
+    expect(h.fallenBalls.length).toBe(1);
+    const f = h.fallenBalls[0];
+    // 向きは生きていたときのまま。速さは、最後に生きて描いたフレームから落ちたフレームまでに上がった分だけ違う
+    expect(f.vx / f.vy).toBeCloseTo(dx / dy, 5);
+    expect(Math.hypot(f.vx, f.vy)).toBeCloseTo(speed, 2);
+    // 最後に生きて描いた時刻へ戻すと、そのとき描いた位置に重なる
+    expect(f.x + f.vx * (drawnAt - f.at)).toBeCloseTo(drawnX, 4);
+    expect(f.y + f.vy * (drawnAt - f.at)).toBeCloseTo(drawnY, 4);
+    // 落ちたフレームの位置は、生きていたボールの描き方と同じく 1 ステップ遅れる
+    expect(f.at).toBeGreaterThan(h.ft.present - STEP_DT - 1e-9);
+  });
+
+  test('一度に落ちたボールは、間引かずにすべて渡す', () => {
+    const sim = new Sim({ mode: stageMode([line(0, 'o')]), seed: 1, config: simConfig() });
+    const h = new Harness({ sim, budget: 0 });
+    h.frame();
+    for (let i = 0; i < 300; i++) placeBall(sim, 0.5 + (i % 80) * 0.1, 0.05, 0, -1);
+    h.frame();
+    expect(h.fallenBalls.length).toBe(300);
   });
 });

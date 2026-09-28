@@ -204,6 +204,7 @@ class GameSession implements SessionHandle {
       flashes: this.flashes,
       particles: view.particles,
       debris: view.debris,
+      fallenBalls: view.fallenBalls,
       vibrate: (pattern) => env.vibrate(pattern),
       inputNow: () => env.now() / 1000,
     };

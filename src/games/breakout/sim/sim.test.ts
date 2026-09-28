@@ -481,6 +481,33 @@ describe('パドル', () => {
     expect(sim.balls.count).toBe(1);
     expect(sim.balls.x[0]).toBeCloseTo(8.2, 9);
   });
+
+  test('奈落に落ちたボールは、ステップの終わりの時刻の位置と速度を Drain で知らせる', () => {
+    const sim = makeSim(shipped(0));
+    sim.step({ paddleTargetX: 1.2, launch: false });
+    const [dx, dy] = [0.6, -0.8];
+    placeBall(sim, 7, 1, dx, dy);
+    // 速さは時間とともに少しずつ上がるので、進んだ距離はステップごとの速さから足し合わせる
+    let d = 0;
+    let found = false;
+    runSteps(sim, 40, () => {
+      d += sim.speed * STEP_DT;
+      const ev = sim.events;
+      for (let i = 0; i < ev.length; i++) {
+        if (ev.kind[i] !== EventKind.Drain) continue;
+        found = true;
+        expect(ev.t[i]).toBe(sim.time);
+        // 止められずにそのまま進んだとしたときの位置
+        expect(ev.x[i]).toBeCloseTo(7 + dx * d, 5);
+        expect(ev.y[i]).toBeCloseTo(1 + dy * d, 5);
+        expect(ev.y[i]).toBeLessThan(-R);
+        expect(ev.a[i]).toBeCloseTo(dx * sim.speed, 5);
+        expect(ev.b[i]).toBeCloseTo(dy * sim.speed, 5);
+      }
+    });
+    expect(found).toBe(true);
+    expect(sim.balls.count).toBe(0);
+  });
 });
 
 describe('ステージ', () => {

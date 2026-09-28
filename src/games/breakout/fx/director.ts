@@ -1,9 +1,9 @@
 import type { CameraRig } from '../../../juice/camera.ts';
 import type { FlashLimiter } from '../../../juice/flash.ts';
 import type { WorldClock } from '../../../juice/time.ts';
-import { FIELD_H, FIELD_W } from '../config.ts';
+import { FIELD_H, FIELD_W, STEP_DT } from '../config.ts';
 import type { FrameTime } from '../frame-time.ts';
-import { Signal } from '../sim/events.ts';
+import { EventKind, Signal } from '../sim/events.ts';
 import type { Sim } from '../sim/sim.ts';
 import type { HudState } from '../types.ts';
 import { FrameSummary, FxFlag, summarize } from './aggregate.ts';
@@ -29,6 +29,9 @@ import { TierTracker } from './tiers.ts';
  */
 const REAL_LONG_AGO = -1e9;
 
+/** 奈落に落ちたボールを描く先。時刻 at（present の時間軸）に位置 (x, y) にあり、速度 (vx, vy) で進む */
+export type FallenBallSink = { emit(at: number, x: number, y: number, vx: number, vy: number): void };
+
 export type DirectorPorts = {
   /** 1 回のプレイの効果音（プレイの VoiceGroup に属する） */
   sfx: SfxPort;
@@ -37,6 +40,7 @@ export type DirectorPorts = {
   /** now は present の時間軸 */
   particles: ParticleSink;
   debris: DebrisSink;
+  fallenBalls: FallenBallSink;
   /** セッションで 1 つ。実時間（FrameTime.real）で問い合わせる */
   flashes: FlashLimiter;
   vibrate(pattern: number | readonly number[]): void;
@@ -200,6 +204,14 @@ export class Director {
       if (flags & FxFlag.PaddleSpark) particles.paddleSparks(now, x, y, hue, budget);
       if (flags & FxFlag.Wall) this.wallHit(now, y, ev.a[i], s.wallCount);
       if (flags & FxFlag.Overflow) particles.overflowStreak(now, x, y);
+    }
+
+    // --- 奈落に落ちたボール ---
+    // ボールは 1 つ前と今の固定ステップの間を補間して描くので、描く位置は sim の時刻より 1 ステップ遅れる。
+    // 生きていたときの描き方とつながるよう、イベントの時刻の位置を 1 ステップ後の present の時刻に置く
+    const fallenAt = ft.present - ft.world + STEP_DT;
+    for (let i = 0; i < ev.length; i++) {
+      if (ev.kind[i] === EventKind.Drain) ports.fallenBalls.emit(fallenAt + ev.t[i], ev.x[i], ev.y[i], ev.a[i], ev.b[i]);
     }
 
     // --- 強さと段階 ---
