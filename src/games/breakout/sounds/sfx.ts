@@ -14,6 +14,8 @@ const BREAK_DECAY_CALM = 0.3;
 const BREAK_DECAY_BUSY = 0.16;
 /** 破壊音の低音の塊は、ピークがこれより小さければ鳴らさない */
 const BREAK_THUMP_MIN = 0.02;
+/** 壊れないブロックに当たる音の芯の周波数 */
+const SOLID_HIT_FREQ = 880;
 
 /** ボール大量ブロックの和音の、ペンタトニックでの構成（step からの距離） */
 const MEGA_CHORD = [0, 2, 4] as const;
@@ -75,18 +77,28 @@ export class BreakoutSfx {
   }
 
   /**
-   * 壊れないブロックに当たる: 短く鈍い、詰まった金属の音。ハードの澄んだ響きと聞き分けられるよう、低く短くする。
+   * 壊れないブロックに当たる: 短く詰まった金属の「ガキン」。
+   * 音の芯は、スマートフォンのスピーカーでも鳴る 1〜2kHz に置く。
+   * ハードとは、響きが短いことと、音程が動かないことで聞き分けられる。
    * count はまとめた回数、gain は間引きによる 1 音の音量
    */
   solidHit(count: number, gain = 1): void {
     const loud = Math.min(1.5, 1 + Math.log2(count) * 0.2);
-    const v = this.open(0.12, 0.45 * loud * gain);
+    const v = this.open(0.14, 0.8 * loud * gain);
     if (!v) return;
     const t = v.start;
-    const f = 260 * 2 ** (jitterCents(40) / 1200);
-    glide(tone(v, t, 'sine', f, 0.001, 0.07, 0.5).frequency, f * 0.7, t + 0.06);
-    tone(v, t, 'triangle', f * 2.31, 0.001, 0.035, 0.12);
-    noise(v, t, 'bandpass', rand(1300, 1700), 2, 0.001, 0.018, 0.22, Math.random());
+    const f = SOLID_HIT_FREQ * 2 ** (jitterCents(30) / 1200);
+    // 整数比にならない 2 音を重ねて金属らしくし、ローパスで角を丸める
+    const lp = v.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 2400;
+    lp.connect(v.out);
+    // 出だしをわずかに緩めて、耳に刺さる角を取る
+    tone(v, t, 'square', f, 0.003, 0.1, 0.08, lp);
+    tone(v, t, 'triangle', f * 1.47, 0.003, 0.07, 0.25, lp);
+    // イヤホンで聞いたときの重さ
+    glide(tone(v, t, 'sine', 260, 0.001, 0.06, 0.25).frequency, 182, t + 0.05);
+    noise(v, t, 'bandpass', rand(1800, 2200), 1.5, 0.003, 0.03, 0.22, Math.random());
   }
 
   /**
