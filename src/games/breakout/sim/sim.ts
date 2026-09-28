@@ -434,7 +434,7 @@ export class Sim {
    * ブロックに当たった。壊れたら、当てたボールが跳ね返った向き（dirX, dirY）を中心に、扇状にボールを出す（分裂）。
    * 下から当てると新しいボールはパドル側へ降ってくるので、拾わないと増えない。
    * 裏に回り込んで上面に当てると上へ飛び、天井とブロックの間で爆発的に増える。
-   * 壊れないブロックは跳ね返すだけで、当たった点（hitX, hitY）を知らせる。
+   * 壊れないブロックは跳ね返すだけ。当たった点（hitX, hitY）は、壊れないブロックに当たったときと壊れたときに知らせる。
    */
   private hitBlock(idx: number, row: number, col: number, dirX: number, dirY: number, hitX: number, hitY: number): void {
     const f = this.field;
@@ -455,7 +455,7 @@ export class Sim {
     }
 
     const chain = this.scoring.onBreak(this._time, type, maxHp);
-    this.events.push(EventKind.BlockBreak, cx, cy, type, chain);
+    this.events.push(EventKind.BlockBreak, cx, cy, type, chain, hitX, hitY);
     this.lastBreakX = cx;
     this.lastBreakY = cy;
 

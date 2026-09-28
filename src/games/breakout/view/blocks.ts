@@ -29,7 +29,7 @@ import { InstanceBuffer, unitQuad } from '../../../engine/instanced.ts';
 import { drawCount } from '../../../engine/ring.ts';
 import { neon, sdRoundBox, sdSegment } from './tsl.ts';
 import { LOOK } from './look.ts';
-import { BLOCK_HUE_BOTTOM, BLOCK_HUE_SPAN, HARD_RGB, SOLID_RGB } from './palette.ts';
+import { BLOCK_HUE_BOTTOM, BLOCK_HUE_SPAN, HARD_MIX, HARD_RGB, MEGA_HUE_PER_X, MEGA_HUE_SPEED, SOLID_RGB } from './palette.ts';
 import type { ViewUniforms } from './uniforms.ts';
 
 const CAPACITY = ROW_CAPACITY * COLS;
@@ -107,8 +107,8 @@ export class BlocksView {
 
       // 行の高さで色相を変える（壊れないブロックは変えない）
       const hueT = a.y.div(FIELD_H).mul(BLOCK_HUE_SPAN).add(BLOCK_HUE_BOTTOM);
-      const edgeHue = select(isMega.greaterThan(0.5), hueT.add(p.x.mul(0.35)).add(u.time.mul(0.5)), hueT);
-      const baseCol = mix(mix(neon(edgeHue), vec3(...HARD_RGB), isHard.mul(0.75)), vec3(...SOLID_RGB), isSolid);
+      const edgeHue = select(isMega.greaterThan(0.5), hueT.add(p.x.mul(MEGA_HUE_PER_X)).add(u.time.mul(MEGA_HUE_SPEED)), hueT);
+      const baseCol = mix(mix(neon(edgeHue), vec3(...HARD_RGB), isHard.mul(HARD_MIX)), vec3(...SOLID_RGB), isSolid);
 
       const edge = exp(abs(d).mul(-55)).mul(LOOK.block.edge).add(exp(abs(d).mul(-14)).mul(LOOK.block.edgeGlow));
       const body = smoothstep(0.01, -0.01, d);

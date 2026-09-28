@@ -7,11 +7,11 @@
  * どちらも `clear()` を呼ぶまで、複数のステップにわたって溜まっていく。
  * 積んだイベントには、起きたステップの終わりの sim の時刻（`t`）も残す。
  *
- * 種類ごとの x, y, a, b:
+ * 種類ごとの x, y, a, b, c, d（書いていないものは 0）:
  * - PaddleHit: 当たった位置, a = パドル上の位置（-1〜1）
  * - WallHit: 当たった位置, a = 壁の向き（左 -1 / 右 1 / 天井 0）, b = 天井なら 1
  * - HardHit: ブロックの中心, a = 残り HP, b = 最大 HP
- * - BlockBreak: ブロックの中心, a = ブロックの種類, b = chain 数
+ * - BlockBreak: ブロックの中心, a = ブロックの種類, b = chain 数, c, d = ボールが当たった、ブロックの輪郭上の点
  * - Overflow: 上限を超えて出てこられなかったボールの位置
  * - Launch: 打ち出した位置
  * - Drain: 奈落に落ちて失ったボールの、そのステップの終わりの位置（そのまま進んだとしたときの位置）, a, b = 速度（u/s）
@@ -57,6 +57,9 @@ export class EventQueue {
   readonly a: Float32Array;
   /** 種類ごとの追加情報（chain 数、残り HP など） */
   readonly b: Float32Array;
+  /** 種類ごとの追加情報（当たった点など） */
+  readonly c: Float32Array;
+  readonly d: Float32Array;
   /** 起きたステップの終わりの sim の時刻 */
   readonly t: Float64Array;
   length = 0;
@@ -75,10 +78,12 @@ export class EventQueue {
     this.y = new Float32Array(capacity);
     this.a = new Float32Array(capacity);
     this.b = new Float32Array(capacity);
+    this.c = new Float32Array(capacity);
+    this.d = new Float32Array(capacity);
     this.t = new Float64Array(capacity);
   }
 
-  push(kind: EventKind, x: number, y: number, a: number, b: number): void {
+  push(kind: EventKind, x: number, y: number, a: number, b: number, c = 0, d = 0): void {
     this.counts[kind]++;
     const i = this.length;
     if (i >= this.capacity) return;
@@ -87,6 +92,8 @@ export class EventQueue {
     this.y[i] = y;
     this.a[i] = a;
     this.b[i] = b;
+    this.c[i] = c;
+    this.d[i] = d;
     this.t[i] = this.time;
     this.length = i + 1;
   }

@@ -15,6 +15,15 @@ export interface DirtySink {
 export const drawCount = (n: number): number => Math.max(2, n);
 
 /**
+ * 予算（0〜1）を掛けた実効容量（最低 1）。予算が数でなければ 1 とみなす。
+ * リングへ書き込む側が、上書きされるまでに書ける数を見積もるときも、この値を使う
+ */
+export function effectiveCapacity(capacity: number, budget: number): number {
+  const b = Number.isFinite(budget) ? Math.min(1, Math.max(0, budget)) : 1;
+  return Math.max(1, Math.min(capacity, Math.round(capacity * b)));
+}
+
+/**
  * リングバッファの書き込み位置と、GPU へ送り直す範囲の管理。GPU のデータには触らない。
  *
  * - 書き込む場所は `claim()` で 1 つずつ受け取る。実効容量（容量 × 予算）に達したら先頭へ戻り、古いものから上書きする
@@ -55,10 +64,9 @@ export class RingCursor {
     return Math.min(this.capacity, drawCount(this.highWater));
   }
 
-  /** 予算（0〜1）。実効容量は容量 × 予算（最低 1） */
+  /** 予算（0〜1）。実効容量は容量 × 予算（最低 1、`effectiveCapacity`） */
   setBudget(budget: number): void {
-    const b = Number.isFinite(budget) ? Math.min(1, Math.max(0, budget)) : 1;
-    this.effective = Math.max(1, Math.min(this.capacity, Math.round(this.capacity * b)));
+    this.effective = effectiveCapacity(this.capacity, budget);
     if (this.head >= this.effective) this.head = 0;
   }
 

@@ -11,6 +11,7 @@ export const PURE_MODULES = [
   'src/app/site.ts',
   'src/games/breakout/config.ts',
   'src/games/breakout/sim/',
+  'src/games/breakout/fx/fracture.ts',
 ];
 
 const isDirectory = (path: string): boolean => path.endsWith('/');

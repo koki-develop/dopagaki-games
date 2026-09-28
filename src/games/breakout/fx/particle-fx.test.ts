@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { BlockType, FIELD_H } from '../config.ts';
-import { blockHue, HARD_RGB, neonRgb, SOLID_RGB } from '../view/palette.ts';
+import { blockHue, HARD_MIX, HARD_RGB, neonRgb, SOLID_RGB } from '../view/palette.ts';
 import { ParticleFx } from './particle-fx.ts';
 import { ParticleShape } from './particle-shape.ts';
 import type { DebrisSpec, ParticleSpec } from './particle-shape.ts';
@@ -15,47 +15,52 @@ function make() {
 }
 
 describe('ParticleFx', () => {
-  test('ブロックの破壊: 光の点 1 つ + 火花 5 個 + 破片 2 個（ハードは 3 個）。色は行の高さだけで決まる', () => {
+  test('ブロックの破壊: 光の点 1 つ + 火花 5 個。破片は出さない。色は行の高さだけで決まり、ハードは金属の色に寄せる', () => {
     const { particles, debris, fx } = make();
-    fx.blockBreak(7, 3, 8, BlockType.Ball, 1, true);
+    fx.blockBreak(7, 3, 8, BlockType.Ball, 1);
     expect(particles.count).toBe(6);
-    expect(debris.count).toBe(2);
+    expect(debris.count).toBe(0);
     const c = neonRgb(blockHue(8 / FIELD_H), [0, 0, 0]);
     const dot = particles.kept[0];
     expect(dot.shape).toBe(ParticleShape.Dot);
     expect([dot.r, dot.g, dot.b]).toEqual([c[0] * 1.4, c[1] * 1.4, c[2] * 1.4]);
     expect(particles.kept[1].shape).toBe(ParticleShape.Spark);
     expect([particles.kept[1].r, particles.kept[1].gravity, particles.kept[1].drag]).toEqual([c[0] * 1.6, 7, 3.2]);
-    expect([debris.kept[0].r, debris.kept[0].g, debris.kept[0].b]).toEqual(c);
 
     const hard = make();
-    hard.fx.blockBreak(7, 3, 8, BlockType.Hard, 1, true);
-    expect(hard.debris.count).toBe(3);
-    const hr = c[0] + (HARD_RGB[0] - c[0]) * 0.75;
-    expect(hard.debris.kept[0].r).toBeCloseTo(hr, 12);
+    hard.fx.blockBreak(7, 3, 8, BlockType.Hard, 1);
+    const hr = c[0] + (HARD_RGB[0] - c[0]) * HARD_MIX;
+    expect(hard.particles.kept[0].r).toBeCloseTo(hr * 1.4, 12);
+  });
+
+  test('ブロックを割ると、破片を出す。出せる数が足りないときは割らない', () => {
+    const { particles, debris, fx } = make();
+    fx.shatter(0, 3, 8, BlockType.Ball, 3, 8 - 0.15, 1);
+    expect(debris.count).toBe(2);
+    expect(particles.count).toBe(0);
+    const empty = make();
+    empty.fx.shatter(0, 3, 8, BlockType.Ball, 3, 8 - 0.15, 0);
+    expect(empty.debris.count).toBe(0);
   });
 
   test('前に出した演出の色が、次の演出の色に混ざらない', () => {
     const a = make();
-    a.fx.blockBreak(0, 3, 8, BlockType.Ball, 1, true);
+    a.fx.blockBreak(0, 3, 8, BlockType.Ball, 1);
     const b = make();
     b.fx.megaBurst(0, 1, 1, 2, 1);
     b.fx.paddleSparks(0, 1, 1, 4, 1);
-    b.fx.blockBreak(0, 3, 8, BlockType.Ball, 1, true);
+    b.fx.blockBreak(0, 3, 8, BlockType.Ball, 1);
     const la = a.particles.kept[0];
     const lb = b.particles.kept[b.particles.kept.length - 6];
     expect([lb.r, lb.g, lb.b]).toEqual([la.r, la.g, la.b]);
   });
 
-  test('ボール大量ブロック: 輪 2 つ + 火花 3 色 × 8 個 + 破片 4 個', () => {
+  test('ボール大量ブロック: 輪 2 つ + 火花 3 色 × 8 個', () => {
     const { particles, debris, fx } = make();
     fx.megaBurst(0, 4, 8, 0, 1);
     expect(particles.kept.filter((p) => p.shape === ParticleShape.Ring).length).toBe(2);
     expect(particles.kept.filter((p) => p.shape === ParticleShape.Spark).length).toBe(24);
-    expect(debris.count).toBe(4);
-    // 破片は最後の火花と同じ色
-    const lastSpark = particles.kept[particles.kept.length - 1];
-    expect(debris.kept[0].r * 1.7).toBeCloseTo(lastSpark.r, 12);
+    expect(debris.count).toBe(0);
   });
 
   test('火花の数は budget で減るが、最低 1 個は出す', () => {
@@ -81,11 +86,11 @@ describe('ParticleFx', () => {
     }
   });
 
-  test('壊れないブロックが砕ける: 光の点 1 つ + 衝撃波の外向きの火花 5 個 + 鋼の色の破片 3 個', () => {
+  test('壊れないブロックが砕ける: 光の点 1 つ + 衝撃波の外向きの火花 5 個', () => {
     const { particles, debris, fx } = make();
-    fx.solidShatter(0, 3, 5, 0, 1, true);
+    fx.solidShatter(0, 3, 5, 0, 1);
     expect(particles.count).toBe(6);
-    expect(debris.count).toBe(3);
+    expect(debris.count).toBe(0);
     const dot = particles.kept[0];
     expect(dot.shape).toBe(ParticleShape.Dot);
     expect([dot.r, dot.g, dot.b]).toEqual([SOLID_RGB[0] * 1.4, SOLID_RGB[1] * 1.4, SOLID_RGB[2] * 1.4]);
@@ -93,10 +98,6 @@ describe('ParticleFx', () => {
       expect(p.shape).toBe(ParticleShape.Spark);
       expect(Math.abs(Math.atan2(p.vy, p.vx))).toBeLessThanOrEqual(1.1 + 1e-9);
     }
-    expect([debris.kept[0].r, debris.kept[0].g, debris.kept[0].b]).toEqual([...SOLID_RGB]);
-    const noDebris = make();
-    noDebris.fx.solidShatter(0, 3, 5, 0, 1, false);
-    expect(noDebris.debris.count).toBe(0);
   });
 
   test('スコアへの光の筋は、スコアの位置を目標にし、寿命がそのまま届くまでの時間', () => {

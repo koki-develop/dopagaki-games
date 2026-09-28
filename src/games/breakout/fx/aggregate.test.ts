@@ -64,6 +64,18 @@ describe('summarize', () => {
     expect(flagged(s, FxFlag.Mega)).toEqual([0, 1, 2]);
   });
 
+  test('弾ける演出を出すボール大量ブロックは、破片の上限を超えていても割る', () => {
+    const ev = new EventQueue(1024);
+    for (let i = 0; i < 200; i++) ev.push(EventKind.BlockBreak, 1, 5, BlockType.Ball, 1);
+    for (let i = 0; i < 5; i++) ev.push(EventKind.BlockBreak, 1, 5, BlockType.Mega, 1);
+    const s = summarize(ev, 1, new FrameSummary());
+    const mega = flagged(s, FxFlag.Mega);
+    expect(mega).toEqual([200, 201, 202]);
+    const debris = flagged(s, FxFlag.Debris);
+    expect(debris.length).toBe(MAX_DEBRIS_FX + mega.length);
+    for (const i of mega) expect(debris).toContain(i);
+  });
+
   test('ハードは残り HP の割合の最小値と、あふれた分も含めた数', () => {
     const ev = new EventQueue(4);
     ev.push(EventKind.HardHit, 1, 5, 3, 4);

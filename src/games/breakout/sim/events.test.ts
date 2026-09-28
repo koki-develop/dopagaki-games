@@ -16,6 +16,15 @@ describe('EventQueue', () => {
     expect(Array.from(q.counts)).toEqual(new Array(EVENT_KIND_COUNT).fill(0));
   });
 
+  test('c, d を渡さないイベントは、同じ位置に前に積んだ c, d を残さない', () => {
+    const q = new EventQueue(4);
+    q.push(EventKind.BlockBreak, 1, 2, 1, 1, 0.8, 2.2);
+    expect([q.c[0], q.d[0]]).toEqual([Math.fround(0.8), Math.fround(2.2)]);
+    q.clear();
+    q.push(EventKind.HardHit, 1, 2, 1, 2);
+    expect([q.c[0], q.d[0]]).toEqual([0, 0]);
+  });
+
   test('積んだイベントには、積んだときの time を残す', () => {
     const q = new EventQueue(4);
     q.time = 0.5;

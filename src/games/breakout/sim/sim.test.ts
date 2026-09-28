@@ -231,8 +231,13 @@ describe('ブロック', () => {
     placeBall(sim, cellCenterX(4), cy - 1, 0, 1);
     let broke = false;
     runSteps(sim, 60, () => {
-      for (let i = 0; i < sim.events.length; i++) {
-        if (sim.events.kind[i] === EventKind.BlockBreak) broke = true;
+      const ev = sim.events;
+      for (let i = 0; i < ev.length; i++) {
+        if (ev.kind[i] !== EventKind.BlockBreak) continue;
+        broke = true;
+        // 当たった点は、ブロックの下の辺の上
+        expect(ev.c[i]).toBeCloseTo(cellCenterX(4), 5);
+        expect(ev.d[i]).toBeCloseTo(cy - BLOCK_H / 2, 5);
       }
     });
     expect(broke).toBe(true);

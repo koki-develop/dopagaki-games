@@ -3,6 +3,7 @@ import type { CameraOffset } from '../../../juice/camera.ts';
 import type { PostChain } from '../../../engine/post.ts';
 import { FIELD_H, FIELD_W, PADDLE_Y } from '../config.ts';
 import type { FrameTime } from '../frame-time.ts';
+import { DEBRIS_CAPACITY } from '../fx/debris.ts';
 import { WALL_HIT_SLOTS } from '../fx/fx-state.ts';
 import type { FxState } from '../fx/fx-state.ts';
 import type { Sim } from '../sim/sim.ts';
@@ -21,11 +22,6 @@ import { VignetteView } from './vignette.ts';
 import type { ViewUniforms } from './uniforms.ts';
 
 const PARTICLE_CAPACITY = 6000;
-/**
- * 破片は画面の外へ落ちるまで描く。フィールドの下端から 10 下まで落ちるのに最長 2.1 秒ほどかかるので、
- * 1 秒あたり約 1900 個までなら、そこまでに上書きされない
- */
-const DEBRIS_CAPACITY = 4096;
 /**
  * 奈落に落ちたボール。最も浅い角度（水平から 15 度、最低の速さ）で落ちたボールは、フィールドの下端から 10 下まで
  * 進むのに 4.3 秒ほどかかるので、1 秒あたり約 470 個までなら、そこまでに上書きされない

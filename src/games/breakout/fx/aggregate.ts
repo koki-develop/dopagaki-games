@@ -22,7 +22,7 @@ export const FxFlag = {
   Mega: 1,
   /** ブロックが壊れる光と火花 */
   Break: 2,
-  /** 破片 */
+  /** ブロックが割れて破片になる */
   Debris: 4,
   /** ハードに当たった火花 */
   HardSpark: 8,
@@ -129,6 +129,8 @@ export function summarize(ev: EventQueue, budget: number, out: FrameSummary): Fr
           flags |= FxFlag.Debris;
         }
       }
+      // 弾ける演出を出すボール大量ブロックは、間引きの対象でなくても必ず割る
+      if (flags & FxFlag.Mega) flags |= FxFlag.Debris;
       breakIdx++;
     } else if (kind === EventKind.HardHit) {
       const ratio = ev.b[i] > 0 ? ev.a[i] / ev.b[i] : 1;

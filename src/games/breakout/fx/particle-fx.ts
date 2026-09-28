@@ -1,11 +1,12 @@
-import { BlockType, FIELD_H, FIELD_W } from '../config.ts';
-import { blockHue, HARD_RGB, neonRgb, SOLID_RGB } from '../view/palette.ts';
+import { FIELD_H, FIELD_W } from '../config.ts';
+import { blockRgb, HARD_RGB, neonRgb, SOLID_RGB } from '../view/palette.ts';
+import { DebrisFx } from './debris.ts';
+import type { DebrisSink } from './debris.ts';
 import { ParticleShape } from './particle-shape.ts';
-import type { DebrisSpec, ParticleSpec } from './particle-shape.ts';
+import type { ParticleSpec } from './particle-shape.ts';
 
 /** now は present の時間軸（シェーダーの u.time）の秒 */
 export type ParticleSink = { emit(now: number, spec: ParticleSpec): void };
-export type DebrisSink = { emit(now: number, spec: DebrisSpec, rand: () => number): void };
 
 /** 光の筋の色。スコアの数字と同じ白に近い金 */
 const STREAK_RGB = [1.6, 1.45, 0.9] as const;
@@ -18,7 +19,7 @@ const TAU = 6.28318;
  */
 export class ParticleFx {
   private readonly particles: ParticleSink;
-  private readonly debrisSink: DebrisSink;
+  private readonly debris: DebrisFx;
   private readonly p: ParticleSpec = {
     x: 0,
     y: 0,
@@ -36,7 +37,6 @@ export class ParticleFx {
     targetX: 0,
     targetY: 0,
   };
-  private readonly d: DebrisSpec = { x: 0, y: 0, vx: 0, vy: 0, r: 0, g: 0, b: 0, size: 0 };
   /** メソッドの中で色を計算するための作業領域。メソッドをまたいで値を持ち越さない */
   private readonly c: [number, number, number] = [0, 0, 0];
   /** HUD のスコアの位置（ワールド座標）。得点に変わった光の筋が吸い込まれる先 */
@@ -45,7 +45,7 @@ export class ParticleFx {
 
   constructor(particles: ParticleSink, debris: DebrisSink) {
     this.particles = particles;
-    this.debrisSink = debris;
+    this.debris = new DebrisFx(debris);
   }
 
   setAnchor(x: number, y: number): void {
@@ -53,23 +53,25 @@ export class ParticleFx {
     this.anchorY = y;
   }
 
-  /** ブロックが壊れる: 光の点と火花、必要なら破片。色は行の高さで決め、ハードは金属の色に寄せる */
-  blockBreak(now: number, x: number, y: number, type: number, budget: number, withDebris: boolean): void {
-    const c = neonRgb(blockHue(y / FIELD_H), this.c);
-    if (type === BlockType.Hard) {
-      c[0] += (HARD_RGB[0] - c[0]) * 0.75;
-      c[1] += (HARD_RGB[1] - c[1]) * 0.75;
-      c[2] += (HARD_RGB[2] - c[2]) * 0.75;
-    }
+  /** ブロックが壊れる: 光の点と火花。色はブロックの中心の縁の色 */
+  blockBreak(now: number, x: number, y: number, type: number, budget: number): void {
+    const c = blockRgb(type, y / FIELD_H, 0, now, this.c);
     const r = c[0];
     const g = c[1];
     const b = c[2];
     this.emit(now, x, y, 0, 0, 0.16, 0.35, 0.8, r * 1.4, g * 1.4, b * 1.4, ParticleShape.Dot, 0, 0);
     this.sparks(now, x, y, r * 1.6, g * 1.6, b * 1.6, 5, 6, budget, Number.NaN);
-    if (withDebris) this.debris(now, x, y, type === BlockType.Hard ? 3 : 2, r, g, b);
   }
 
-  /** ボール大量ブロックが弾ける: 2 重の輪と 3 色の火花、破片。hue は背景の色相のずれ（ラジアン） */
+  /**
+   * 中心 (x, y) のブロック（種類 type）を、点 (fromX, fromY) から力を受けて破片に割る（`DebrisFx.shatter`）。
+   * 出せる破片の数が足りなければ割らない
+   */
+  shatter(now: number, x: number, y: number, type: number, fromX: number, fromY: number, budget: number): void {
+    this.debris.shatter(now, x, y, type, fromX, fromY, budget);
+  }
+
+  /** ボール大量ブロックが弾ける: 2 重の輪と 3 色の火花。hue は背景の色相のずれ（ラジアン） */
   megaBurst(now: number, x: number, y: number, hue: number, budget: number): void {
     const c = neonRgb(hue / TAU + Math.random(), this.c);
     this.ring(now, x, y, 0.3, 3.2, 0.55, 1.4, 1.3, 1.1);
@@ -78,8 +80,6 @@ export class ParticleFx {
       neonRgb(hue / TAU + k * 0.33 + Math.random() * 0.1, c);
       this.sparks(now, x, y, c[0] * 1.7, c[1] * 1.7, c[2] * 1.7, 8, 9, budget, Number.NaN);
     }
-    // 破片は最後の火花と同じ色にする
-    this.debris(now, x, y, 4, c[0], c[1], c[2]);
   }
 
   /** ハードに当たった火花 */
@@ -94,16 +94,15 @@ export class ParticleFx {
   }
 
   /**
-   * 壊れないブロックがフィナーレの衝撃波で砕ける: 光の点と、aim（衝撃波の中心から外への向き）へ散る火花、必要なら破片。
+   * 壊れないブロックがフィナーレの衝撃波で砕ける: 光の点と、aim（衝撃波の中心から外への向き）へ散る火花。
    * 色は鋼の色
    */
-  solidShatter(now: number, x: number, y: number, aim: number, budget: number, withDebris: boolean): void {
+  solidShatter(now: number, x: number, y: number, aim: number, budget: number): void {
     const r = SOLID_RGB[0];
     const g = SOLID_RGB[1];
     const b = SOLID_RGB[2];
     this.emit(now, x, y, 0, 0, 0.16, 0.35, 0.8, r * 1.4, g * 1.4, b * 1.4, ParticleShape.Dot, 0, 0);
     this.sparks(now, x, y, r * 1.6, g * 1.6, b * 1.6, 5, 6, budget, aim);
-    if (withDebris) this.debris(now, x, y, 3, r, g, b);
   }
 
   /** パドルで打った火花。上向きに散らし、色は背景の色相の反対側 */
@@ -194,21 +193,6 @@ export class ParticleFx {
     p.targetX = this.anchorX;
     p.targetY = this.anchorY;
     this.particles.emit(now, p);
-  }
-
-  private debris(now: number, x: number, y: number, count: number, r: number, g: number, b: number): void {
-    const d = this.d;
-    for (let k = 0; k < count; k++) {
-      d.x = x + (Math.random() - 0.5) * 0.6;
-      d.y = y + (Math.random() - 0.5) * 0.25;
-      d.vx = (Math.random() - 0.5) * 5;
-      d.vy = 1 + Math.random() * 4;
-      d.r = r;
-      d.g = g;
-      d.b = b;
-      d.size = 0.1 + Math.random() * 0.1;
-      this.debrisSink.emit(now, d, Math.random);
-    }
   }
 
   private emit(

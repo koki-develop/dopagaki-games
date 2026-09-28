@@ -49,10 +49,11 @@ export const LOOK = {
   },
   /** 粒は数が多いと加算で眩しくなるので、発生時の色より抑えて描く */
   particles: 0.65,
+  /** 破片は bloom の閾値（bloom.threshold）より暗く描き、光らせない */
   debris: {
-    /** 落ちている間ずっと灯る明るさと、割れた直後だけ上乗せする明るさ */
-    base: 0.22,
-    flight: 0.8,
+    /** 縁の線と、中の塗り */
+    edge: 0.55,
+    fill: 0.14,
   },
   background: {
     grid: 0.08,

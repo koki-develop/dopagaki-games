@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { drawCount, RingCursor } from './ring.ts';
+import { drawCount, effectiveCapacity, RingCursor } from './ring.ts';
 import type { DirtySink } from './ring.ts';
 import { UploadScheduler } from './upload-ranges.ts';
 import type { UploadRange, UploadTarget } from './upload-ranges.ts';
@@ -235,6 +235,7 @@ describe('RingCursor', () => {
     expect(wrapAfter(0)).toBe(1);
     expect(wrapAfter(Number.NaN)).toBe(10);
     expect(wrapAfter(0.5)).toBe(5);
+    for (const budget of [2, 0, Number.NaN, 0.5, 0.33]) expect(wrapAfter(budget)).toBe(effectiveCapacity(10, budget));
   });
 });
 

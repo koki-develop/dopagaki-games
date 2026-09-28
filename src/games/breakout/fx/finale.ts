@@ -1,7 +1,7 @@
 import type { CameraRig } from '../../../juice/camera.ts';
 import type { FlashLimiter } from '../../../juice/flash.ts';
 import type { WorldClock } from '../../../juice/time.ts';
-import { BALL_CAP, FIELD_H, FIELD_W } from '../config.ts';
+import { BALL_CAP, BlockType, FIELD_H, FIELD_W } from '../config.ts';
 import type { FrameTime } from '../frame-time.ts';
 import type { Sim } from '../sim/sim.ts';
 import { LOOK } from '../view/look.ts';
@@ -126,7 +126,9 @@ export class Finale {
     this.shattered++;
     if (this.shatterFx >= this.shatterLimit) return;
     const aim = Math.atan2(y - this.y, x - this.x);
-    this.d.particles.solidShatter(this.framePresent, x, y, aim, this.frameBudget, this.shatterFx < this.shatterDebrisLimit);
+    this.d.particles.solidShatter(this.framePresent, x, y, aim, this.frameBudget);
+    // 衝撃波の中心の側から割る
+    if (this.shatterFx < this.shatterDebrisLimit) this.d.particles.shatter(this.framePresent, x, y, BlockType.Solid, this.x, this.y, this.frameBudget);
     this.shatterFx++;
   };
   private readonly all = (): boolean => true;
