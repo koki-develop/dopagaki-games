@@ -1,6 +1,6 @@
 import { Component } from 'react';
 import type { ReactNode } from 'react';
-import { hrefOf } from '../router.ts';
+import Link from './Link.tsx';
 import Overlay from './Overlay.tsx';
 
 type Props = { children: ReactNode };
@@ -26,9 +26,9 @@ export default class RouteErrorBoundary extends Component<Props, State> {
               <button type="button" className="btn" data-variant="primary" onClick={() => window.location.reload()}>
                 読み込み直す
               </button>
-              <a className="btn" href={hrefOf('portal')}>
+              <Link className="btn" to="portal">
                 もどる
-              </a>
+              </Link>
             </div>
           </div>
         </Overlay>

@@ -1,7 +1,5 @@
-import { hrefOf } from './router.ts';
-
-/** 遊べるゲーム。上から番号を振って並べる */
-const GAMES = [{ route: 'breakout', title: 'ブロック崩し' }] as const;
+import { GAMES } from './site.ts';
+import Link from './ui/Link.tsx';
 
 export default function Portal() {
   return (
@@ -13,14 +11,14 @@ export default function Portal() {
 
       <ol className="portal-games">
         {GAMES.map((g, i) => (
-          <li key={g.route}>
-            <a className="portal-game" href={hrefOf(g.route)}>
+          <li key={g.id}>
+            <Link className="portal-game" to={g.id}>
               <span className="portal-game-no">{String(i + 1).padStart(2, '0')}</span>
               <span className="portal-game-title">{g.title}</span>
               <span className="portal-game-arrow" aria-hidden="true">
                 →
               </span>
-            </a>
+            </Link>
           </li>
         ))}
       </ol>

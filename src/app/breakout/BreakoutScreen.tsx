@@ -9,8 +9,8 @@ import { errorMessage } from '../../shared/errors.ts';
 import SettingsPanel from '../SettingsPanel.tsx';
 import ConfirmDialog from '../ui/ConfirmDialog.tsx';
 import { LoadingOverlay } from '../ui/LoadingScreen.tsx';
+import Link from '../ui/Link.tsx';
 import Overlay from '../ui/Overlay.tsx';
-import { hrefOf } from '../router.ts';
 import DevPanel from './DevPanel.tsx';
 import Hud from './Hud.tsx';
 import PauseView from './PauseView.tsx';
@@ -148,7 +148,6 @@ export default function BreakoutScreen() {
           onEndless={() => dispatch({ t: 'choose', mode: { kind: 'endless' } })}
           onStages={() => dispatch({ t: 'openStages' })}
           onSettings={() => dispatch({ t: 'openSettings' })}
-          portalHref={hrefOf('portal')}
         />
       )}
 
@@ -199,9 +198,9 @@ export default function BreakoutScreen() {
             <p>{FATAL_TEXT[phase.cause]}</p>
             <p className="muted small">{phase.message}</p>
             <div className="panel-actions">
-              <a className="btn" href={hrefOf('portal')}>
+              <Link className="btn" to="portal">
                 もどる
-              </a>
+              </Link>
             </div>
           </div>
         </Overlay>

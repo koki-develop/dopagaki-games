@@ -1,7 +1,11 @@
 import { lazy, Suspense, useEffect } from 'react';
+import NotFound from './app/NotFound.tsx';
 import Portal from './app/Portal.tsx';
-import { canonicalHash, useRoute } from './app/router.ts';
+import { useRoute } from './app/router.ts';
+import { documentTitle } from './app/site.ts';
+import type { Route } from './app/site.ts';
 import LoadingScreen from './app/ui/LoadingScreen.tsx';
+import RouteAnnouncer from './app/ui/RouteAnnouncer.tsx';
 import RouteErrorBoundary from './app/ui/RouteErrorBoundary.tsx';
 
 // three.js を含むゲーム本体は、ゲームを開いたときに初めて読み込む
@@ -9,22 +13,35 @@ const BreakoutScreen = lazy(() => import('./app/breakout/BreakoutScreen.tsx'));
 
 export default function App() {
   const route = useRoute();
+  const title = documentTitle(route);
 
+  // 読み込んだときの値はビルド時に HTML へ書いてあるので、ここではページ内の遷移に合わせて書き換える
   useEffect(() => {
     document.documentElement.dataset.route = route;
-    // #/breakout/ や知らないハッシュは、表示している画面の正規の URL に置き換える
-    const canonical = canonicalHash(window.location.hash);
-    if (canonical !== null) window.history.replaceState(window.history.state, '', canonical);
-  }, [route]);
+    document.title = title;
+  }, [route, title]);
 
-  if (route === 'breakout') {
-    return (
-      <RouteErrorBoundary key={route}>
-        <Suspense fallback={<LoadingScreen />}>
-          <BreakoutScreen />
-        </Suspense>
-      </RouteErrorBoundary>
-    );
+  return (
+    <>
+      <RouteView route={route} />
+      <RouteAnnouncer title={title} />
+    </>
+  );
+}
+
+function RouteView({ route }: { route: Route }) {
+  switch (route) {
+    case 'breakout':
+      return (
+        <RouteErrorBoundary key={route}>
+          <Suspense fallback={<LoadingScreen />}>
+            <BreakoutScreen />
+          </Suspense>
+        </RouteErrorBoundary>
+      );
+    case 'portal':
+      return <Portal />;
+    case 'notFound':
+      return <NotFound />;
   }
-  return <Portal />;
 }

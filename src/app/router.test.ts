@@ -1,26 +1,24 @@
 import { describe, expect, test } from 'bun:test';
-import { canonicalHash, hrefOf, parseRoute } from './router.ts';
+import { isPlainClick } from './router.ts';
+import type { ClickFacts } from './router.ts';
 
-describe('parseRoute', () => {
-  test('前後のスラッシュと大文字小文字の違いを無視する', () => {
-    for (const h of ['#/breakout', '#breakout', '#/breakout/', '#//BreakOut//']) expect(parseRoute(h)).toBe('breakout');
+describe('isPlainClick', () => {
+  const plain: ClickFacts = { button: 0, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, defaultPrevented: false };
+
+  test('修飾キーのない左クリックだけを横取りする', () => {
+    expect(isPlainClick(plain)).toBe(true);
   });
 
-  test('空や知らないハッシュはポータル', () => {
-    for (const h of ['', '#', '#/', '#/nope', '#/breakout/x', '#/portal']) expect(parseRoute(h)).toBe('portal');
-  });
-
-  test('正規の形はそのまま読める', () => {
-    for (const r of ['portal', 'breakout'] as const) expect(parseRoute(hrefOf(r))).toBe(r);
-  });
-});
-
-describe('canonicalHash', () => {
-  test('正規の形でないハッシュだけを書き換える', () => {
-    expect(canonicalHash('#/breakout/')).toBe('#/breakout');
-    expect(canonicalHash('#/nope')).toBe('#/');
-    expect(canonicalHash('#/breakout')).toBeNull();
-    expect(canonicalHash('#/')).toBeNull();
-    expect(canonicalHash('')).toBeNull();
+  test('新しいタブやウィンドウで開く操作、止められたクリックはブラウザに任せる', () => {
+    for (const facts of [
+      { ...plain, button: 1 },
+      { ...plain, button: 2 },
+      { ...plain, metaKey: true },
+      { ...plain, ctrlKey: true },
+      { ...plain, shiftKey: true },
+      { ...plain, altKey: true },
+      { ...plain, defaultPrevented: true },
+    ])
+      expect(isPlainClick(facts)).toBe(false);
   });
 });
