@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
+    "lint": "oxlint && depcruise src build vite.config.ts",
     "preview": "vite preview",
     "test": "bun test"
   },
@@ -30,6 +30,7 @@
     "@types/three": "0.186.0",
     "@vitejs/plugin-react": "6.1.1",
     "babel-plugin-react-compiler": "1.0.0",
+    "dependency-cruiser": "18.4.0",
     "oxlint": "1.85.0",
     "satori": "0.33.5",
     "sharp": "0.35.5",
