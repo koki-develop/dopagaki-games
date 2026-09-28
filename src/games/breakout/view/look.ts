@@ -35,6 +35,10 @@ export const LOOK = {
     corePulse: 0.35,
     /** 当たった瞬間に白く光る強さ */
     hitFlash: 0.6,
+    /** 壊れないブロック: 板の塗り、斜めの縞、当たった瞬間の光 */
+    solidFill: 0.3,
+    solidStripe: 0.14,
+    solidHitFlash: 0.3,
   },
   paddle: {
     edge: 1.2,

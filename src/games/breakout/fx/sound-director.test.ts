@@ -56,6 +56,22 @@ describe('SoundDirector', () => {
     expect(calls[1].args[1]).toBe(3);
   });
 
+  test('壊れないブロックの音は 0.06 秒より詰めて鳴らさず、その間の当たりを次の 1 音にまとめる', () => {
+    const t = setup();
+    t.s.solidCount = 2;
+    for (let i = 0; i < 60; i++) t.step();
+    const calls = t.rec.of('sfx.solidHit');
+    expect(calls.length).toBeLessThanOrEqual(Math.ceil(1 / 0.06) + 1);
+    expect(calls.length).toBeGreaterThan(8);
+    expect(calls[0].args[0]).toBe(2);
+    // 間引いている間の当たりも数える
+    expect(calls[1].args[0]).toBeGreaterThan(2);
+    t.s.solidCount = 0;
+    const n = calls.length;
+    for (let i = 0; i < 30; i++) t.step();
+    expect(t.rec.of('sfx.solidHit').length).toBe(n);
+  });
+
   test('ボール大量ブロックの音は 1 フレームに 1 回', () => {
     const t = setup();
     t.s.megaCount = 3;
@@ -149,6 +165,7 @@ describe('SoundDirector', () => {
     t.s.breaks = 5;
     t.s.paddleCount = 2;
     t.s.hardCount = 2;
+    t.s.solidCount = 2;
     t.s.megaCount = 1;
     for (let i = 0; i < 30; i++) t.step();
     t.sounds.quiesce();

@@ -54,10 +54,54 @@ describe('BlockField', () => {
     expect(f.liveCount).toBe(1);
   });
 
-  test('HP が Uint8 に収まらないセルは作らない', () => {
+  test('壊せるブロックの HP は 1〜255、空きと壊れないブロックの HP は 0', () => {
     const f = filled(1);
     expect(() => f.setCell(0, 2, BlockType.Hard, 256, 0)).toThrow(/does not fit/);
+    expect(() => f.setCell(0, 2, BlockType.Hard, 0, 0)).toThrow(/does not fit/);
     expect(() => f.setCell(0, 2, BlockType.Hard, 255, 0)).not.toThrow();
+    expect(() => f.setCell(0, 3, BlockType.Solid, 1, 0)).toThrow(/must have hp 0/);
+    expect(() => f.setCell(0, 3, BlockType.Empty, 1, 0)).toThrow(/must have hp 0/);
+    expect(() => f.setCell(0, 3, BlockType.Solid, 0, 0)).not.toThrow();
+  });
+
+  test('壊れないブロックは生きているブロックに数え、壊せるブロックには数えない', () => {
+    const f = filled(2);
+    expect([f.liveCount, f.breakableCount]).toEqual([2, 2]);
+    f.setCell(0, 1, BlockType.Solid, 0, 0);
+    expect([f.liveCount, f.breakableCount]).toEqual([3, 2]);
+    // 種類を置き換えても二重に数えない
+    f.setCell(0, 0, BlockType.Solid, 0, 0);
+    expect([f.liveCount, f.breakableCount]).toEqual([3, 1]);
+    f.setCell(0, 1, BlockType.Mega, 1, 0);
+    expect([f.liveCount, f.breakableCount]).toEqual([3, 2]);
+    f.removeAt(f.slotOf(0) * COLS);
+    expect([f.liveCount, f.breakableCount]).toEqual([2, 2]);
+    f.setCell(1, 5, BlockType.Solid, 0, 0);
+    f.removeAt(f.slotOf(1) * COLS);
+    expect([f.liveCount, f.breakableCount]).toEqual([2, 1]);
+    f.clearAll();
+    expect([f.liveCount, f.breakableCount]).toEqual([0, 0]);
+  });
+
+  test('壊れないブロックは HP を減らせない', () => {
+    const f = filled(1);
+    f.setCell(0, 4, BlockType.Solid, 0, 0);
+    const idx = f.slotOf(0) * COLS + 4;
+    expect(() => f.damageAt(idx)).toThrow(/cannot be damaged/);
+    expect(f.type[idx]).toBe(BlockType.Solid);
+    expect(() => f.damageAt(f.slotOf(0) * COLS + 5)).toThrow(/cannot be damaged/);
+  });
+
+  test('一番下の行を捨てると、その行の壊せるブロックの分だけ減らす', () => {
+    const f = filled(3);
+    f.setCell(0, 1, BlockType.Solid, 0, 0);
+    f.setCell(0, 2, BlockType.Hard, 5, 0);
+    expect([f.liveCount, f.breakableCount]).toEqual([5, 4]);
+    f.popRowBottom();
+    expect([f.liveCount, f.breakableCount]).toEqual([2, 2]);
+    // 捨てた枠を使い回した行には、前の中身を数えない
+    for (let i = 0; i < ROW_CAPACITY - 2; i++) f.pushRowTop();
+    expect([f.liveCount, f.breakableCount]).toEqual([2, 2]);
   });
 
   test('空のセルを消しても何も変わらない', () => {

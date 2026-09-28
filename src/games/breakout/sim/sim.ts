@@ -112,7 +112,9 @@ export class Sim {
     this.paddleMax = range.max;
     this.rng = new Rng(opts.seed);
     this.scoring = new Scoring(cfg.score);
-    const handler: BlockHitHandler = { onBlockHit: (idx, row, col, dirX, dirY) => this.hitBlock(idx, row, col, dirX, dirY) };
+    const handler: BlockHitHandler = {
+      onBlockHit: (idx, row, col, dirX, dirY, hitX, hitY) => this.hitBlock(idx, row, col, dirX, dirY, hitX, hitY),
+    };
     this.collider = new Collider(this.ballStore, this.field, this.events, cfg, handler);
     this._speed = cfg.ball.speedStart;
     this._lives = opts.mode.kind === 'stage' ? cfg.stage.lives : 0;
@@ -403,14 +405,19 @@ export class Sim {
    * ブロックに当たった。壊れたら、当てたボールが跳ね返った向き（dirX, dirY）を中心に、扇状にボールを出す（分裂）。
    * 下から当てると新しいボールはパドル側へ降ってくるので、拾わないと増えない。
    * 裏に回り込んで上面に当てると上へ飛び、天井とブロックの間で爆発的に増える。
+   * 壊れないブロックは跳ね返すだけで、当たった点（hitX, hitY）を知らせる。
    * 決着した後は、揺れの演出のために当たった時刻だけを残す。
    */
-  private hitBlock(idx: number, row: number, col: number, dirX: number, dirY: number): void {
+  private hitBlock(idx: number, row: number, col: number, dirX: number, dirY: number, hitX: number, hitY: number): void {
     const f = this.field;
     f.markHit(idx, this._time);
     if (this._phase !== 'playing') return;
     const type = f.type[idx] as BlockType;
     if (type === BlockType.Empty) return;
+    if (type === BlockType.Solid) {
+      this.events.push(EventKind.SolidHit, hitX, hitY, dirX, dirY);
+      return;
+    }
     const cx = cellCenterX(col);
     const cy = f.centerY(row);
     const maxHp = f.maxHp[idx];
@@ -455,7 +462,7 @@ export class Sim {
     const e = this.config.endless;
 
     if (this.mode.kind === 'stage') {
-      if (f.liveCount === 0) {
+      if (f.breakableCount === 0) {
         this._phase = 'cleared';
         this.scoring.startClearBonus(this.ballStore.count);
         ev.signalAt(Signal.StageClear, this.lastBreakX, this.lastBreakY);

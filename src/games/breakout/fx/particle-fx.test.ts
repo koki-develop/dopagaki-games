@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { BlockType, FIELD_H } from '../config.ts';
-import { blockHue, HARD_RGB, neonRgb } from '../view/palette.ts';
+import { blockHue, HARD_RGB, neonRgb, SOLID_RGB } from '../view/palette.ts';
 import { ParticleFx } from './particle-fx.ts';
 import { ParticleShape } from './particle-shape.ts';
 import type { DebrisSpec, ParticleSpec } from './particle-shape.ts';
@@ -65,6 +65,20 @@ describe('ParticleFx', () => {
     particles.count = 0;
     fx.finaleBurst(0, 1, 1, 0.5);
     expect(particles.count).toBe(1 + 20);
+  });
+
+  test('壊れないブロックの火花: 当たった点から、跳ね返ったボールの向きを中心に鋼の色で 2 個', () => {
+    const { particles, fx } = make();
+    fx.solidSparks(0, 3, 5, 0, -1, 1);
+    expect(particles.count).toBe(2);
+    for (const p of particles.kept) {
+      expect([p.x, p.y]).toEqual([3, 5]);
+      expect(p.shape).toBe(ParticleShape.Spark);
+      expect([p.r, p.g, p.b]).toEqual([SOLID_RGB[0] * 1.3, SOLID_RGB[1] * 1.3, SOLID_RGB[2] * 1.3]);
+      // 下向きを中心に ±1.1 ラジアン
+      expect(Math.atan2(p.vy, p.vx)).toBeGreaterThanOrEqual(-Math.PI / 2 - 1.1 - 1e-9);
+      expect(Math.atan2(p.vy, p.vx)).toBeLessThanOrEqual(-Math.PI / 2 + 1.1 + 1e-9);
+    }
   });
 
   test('スコアへの光の筋は、スコアの位置を目標にし、寿命がそのまま届くまでの時間', () => {

@@ -65,7 +65,7 @@ export default function DevPanel({ session }: Props) {
             {stats.backend} / Q{stats.quality} / {stats.fps.toFixed(1)}fps / worst {stats.frameMs.toFixed(1)}ms
           </p>
           <p>
-            balls {stats.balls} / blocks {stats.live} / {stats.phase} / audio {stats.audio} / voices {stats.voices}
+            balls {stats.balls} / blocks {stats.breakable} / {stats.phase} / audio {stats.audio} / voices {stats.voices}
           </p>
           <div className="dev-row">
             <button type="button" onClick={() => hooks.debugAddBalls(100)}>

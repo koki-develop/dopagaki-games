@@ -7,7 +7,7 @@ describe('STAGES', () => {
     expect(STAGES.length).toBe(5);
     for (const s of STAGES) {
       const p = parseStage(s);
-      expect(p.liveCount).toBeGreaterThan(0);
+      expect(p.breakableCount).toBeGreaterThan(0);
     }
   });
 

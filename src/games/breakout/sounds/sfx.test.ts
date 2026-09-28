@@ -17,6 +17,7 @@ function setup() {
 const NODES_PER_CALL: [string, (s: BreakoutSfx) => void, number][] = [
   ['paddle', (s) => s.paddle(1, 1), 8],
   ['hardHit', (s) => s.hardHit(0.5, 1), 10],
+  ['solidHit', (s) => s.solidHit(1), 8],
   ['breakNote (count 1)', (s) => s.breakNote(3, 1, 0.5, 1), 6],
   ['breakNote (count 3)', (s) => s.breakNote(3, 3, 0.5, 1), 8],
   ['breakNote (count 3, brightness 1)', (s) => s.breakNote(3, 3, 1, 1), 6],

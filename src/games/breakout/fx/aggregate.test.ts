@@ -9,6 +9,7 @@ import {
   MAX_DEBRIS_FX,
   MAX_HARD_FX,
   MAX_OVERFLOW_FX,
+  MAX_SOLID_FX,
   MAX_WALL_FX,
   summarize,
 } from './aggregate.ts';
@@ -39,10 +40,12 @@ describe('summarize', () => {
     const ev = new EventQueue(1024);
     for (let i = 0; i < 200; i++) ev.push(EventKind.BlockBreak, 1, 5, BlockType.Ball, 1);
     for (let i = 0; i < 40; i++) ev.push(EventKind.HardHit, 1, 5, 1, 4);
+    for (let i = 0; i < 40; i++) ev.push(EventKind.SolidHit, 1, 5, 0, -1);
     const s = summarize(ev, 0.5, new FrameSummary());
     expect(flagged(s, FxFlag.Break).length).toBe(Math.ceil(MAX_BREAK_FX * 0.5));
     expect(flagged(s, FxFlag.Debris).length).toBe(Math.ceil(MAX_DEBRIS_FX * 0.5));
     expect(flagged(s, FxFlag.HardSpark).length).toBe(MAX_HARD_FX * 0.5);
+    expect(flagged(s, FxFlag.SolidSpark).length).toBe(MAX_SOLID_FX * 0.5);
   });
 
   test('少ない破壊は間引かない', () => {
@@ -71,6 +74,14 @@ describe('summarize', () => {
     const s = summarize(ev, 1, new FrameSummary());
     expect(s.hardCount).toBe(5);
     expect(s.hardMinRatio).toBe(0.25);
+  });
+
+  test('壊れないブロックは、あふれた分も含めて数え、火花は先に起きたものから上限まで', () => {
+    const ev = new EventQueue(MAX_SOLID_FX + 4);
+    for (let i = 0; i < MAX_SOLID_FX + 10; i++) ev.push(EventKind.SolidHit, 1, 5, 0, -1);
+    const s = summarize(ev, 1, new FrameSummary());
+    expect(s.solidCount).toBe(MAX_SOLID_FX + 10);
+    expect(flagged(s, FxFlag.SolidSpark)).toEqual(Array.from({ length: MAX_SOLID_FX }, (_, i) => i));
   });
 
   test('パドルの火花は打ち出しも数えて 4 個まで。位置は最後に当たったもの', () => {
@@ -113,13 +124,13 @@ describe('summarize', () => {
 
   test('使い回しても前のフレームの値を残さない。一覧は容量を超えない', () => {
     const ev = new EventQueue(8192);
-    for (let i = 0; i < 2000; i++) ev.push((i % 6) as EventKind, 1, 5, i % 4, 3);
+    for (let i = 0; i < 2000; i++) ev.push((i % 8) as EventKind, 1, 5, i % 4, 3);
     const s = summarize(ev, 1, new FrameSummary());
     expect(s.length).toBeLessThanOrEqual(FX_LIST_CAPACITY);
     ev.clear();
     summarize(ev, 1, s);
-    expect([s.length, s.breaks, s.maxChain, s.megaCount, s.hardCount, s.hardMinRatio, s.paddleCount, s.wallCount, s.signals]).toEqual([
-      0, 0, 0, 0, 0, 1, 0, 0, 0,
+    expect([s.length, s.breaks, s.maxChain, s.megaCount, s.hardCount, s.hardMinRatio, s.solidCount, s.paddleCount, s.wallCount, s.signals]).toEqual([
+      0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
     ]);
   });
 

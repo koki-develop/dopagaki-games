@@ -8,10 +8,10 @@ import { Atmosphere, FLASH_EPSILON, TIER_FALL_TAU, TIER_RISE_TAU } from './atmos
 import { createFxState } from './fx-state.ts';
 import { Recorder, recordingBgm } from './test-kit.test-support.ts';
 
-function setup(sim: Sim, initialLive = sim.blocks.liveCount) {
+function setup(sim: Sim, initialBreakable = sim.blocks.breakableCount) {
   const rec = new Recorder();
   const bgm = recordingBgm(rec);
-  const atm = new Atmosphere(bgm, initialLive);
+  const atm = new Atmosphere(bgm, initialBreakable);
   const camera = new CameraRig({ maxOffset: 0.3, maxRotation: 0.03, decayPerSecond: 1.2, frequency: 18 });
   const fx = createFxState(sim.mode.kind === 'endless', 0, 0);
   const ft: FrameTime = { realDt: 1 / 60, worldDt: 1 / 60, real: 0, world: 0, present: 0 };
@@ -108,6 +108,14 @@ describe('Atmosphere', () => {
     expect(t.rec.of('bgm.setRiser').at(-1)?.args).toEqual([0]);
     t.step(0);
     expect(t.fx.glow).toBeLessThan(0.05);
+  });
+
+  test('ライザーの基準は壊せるブロックの残りで、壊れないブロックは数えない', () => {
+    // 壊せるブロックの残りは 1 / 8、壊れないブロックも含めると 13 / 8
+    const sim = new Sim({ mode: stageMode(emptyRows(10).concat(['X'.repeat(12), line(2, 'o')])), seed: 1, config: simConfig() });
+    const t = setup(sim, 8);
+    for (let i = 0; i < 30; i++) t.step(0);
+    expect(t.rec.of('bgm.setRiser').at(-1)!.args[0] as number).toBeGreaterThan(0);
   });
 
   test('ゲームオーバーでは音だけを消し、背景の輝度は残す', () => {

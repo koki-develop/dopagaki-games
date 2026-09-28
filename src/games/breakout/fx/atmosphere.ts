@@ -30,7 +30,7 @@ const TWO_PI = Math.PI * 2;
  */
 export class Atmosphere {
   private readonly bgm: BgmPort;
-  private readonly initialLive: number;
+  private readonly initialBreakable: number;
   tierSmooth = 0;
   hue = 0;
   private hueVel = 0;
@@ -39,10 +39,10 @@ export class Atmosphere {
   private flash = 0;
   private bloomBoost = 0;
 
-  /** initialLive はプレイ開始時のブロック数（終盤の高まりの基準） */
-  constructor(bgm: BgmPort, initialLive: number) {
+  /** initialBreakable はプレイ開始時の壊せるブロックの数（終盤の高まりの基準） */
+  constructor(bgm: BgmPort, initialBreakable: number) {
     this.bgm = bgm;
-    this.initialLive = Math.max(1, initialLive);
+    this.initialBreakable = Math.max(1, initialBreakable);
   }
 
   /** 画面全体を v の明るさで光らせる。フラッシュリミッターの許可を得てから呼ぶ */
@@ -94,7 +94,7 @@ export class Atmosphere {
       const danger = Number.isFinite(lowest) ? clamp01(1 - (lowest - DANGER_Y) / 4) : 0;
       this.danger = damp(this.danger, danger, 0.3, realDt);
     } else if (sim.phase === 'playing') {
-      const ratio = sim.blocks.liveCount / this.initialLive;
+      const ratio = sim.blocks.breakableCount / this.initialBreakable;
       const level = ratio < 0.25 ? 1 - ratio / 0.25 : 0;
       this.riser = damp(this.riser, level, 0.25, realDt);
       this.bgm.setRiser(this.riser);

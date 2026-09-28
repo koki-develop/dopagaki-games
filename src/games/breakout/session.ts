@@ -122,7 +122,8 @@ export type BreakoutDebugHooks = {
     backend: string;
     quality: number;
     balls: number;
-    live: number;
+    /** 残っている壊せるブロックの数 */
+    breakable: number;
     phase: Sim['phase'];
     audio: AudioContextState | 'none';
     voices: number;
@@ -533,7 +534,7 @@ class GameSession implements SessionHandle {
           backend: this.graphics?.backend ?? 'none',
           quality: this.governor.level,
           balls: sim.ballCount,
-          live: sim.blocks.liveCount,
+          breakable: sim.blocks.breakableCount,
           phase: sim.phase,
           audio: a.ctx?.state ?? 'none',
           voices: a.activeVoices('sfx') + a.activeVoices('bgm'),

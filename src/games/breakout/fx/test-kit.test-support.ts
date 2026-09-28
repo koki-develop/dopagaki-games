@@ -25,6 +25,7 @@ type Call = { name: string; args: unknown[] };
 const SFX_METHODS = [
   'paddle',
   'hardHit',
+  'solidHit',
   'breakNote',
   'megaBurst',
   'ballsZero',

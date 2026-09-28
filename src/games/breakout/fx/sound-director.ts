@@ -9,6 +9,7 @@ export type SfxPort = Pick<
   BreakoutSfx,
   | 'paddle'
   | 'hardHit'
+  | 'solidHit'
   | 'breakNote'
   | 'megaBurst'
   | 'ballsZero'
@@ -28,8 +29,8 @@ export const BREAK_MIN_INTERVAL = 0.04;
 const BONUS_STEPS = 40;
 
 /**
- * 1 フレームぶんのイベントの集計から、大量に起きる音（パドル・ハード・破壊・ボール大量ブロック）を鳴らす。
- * パドル・ハード・破壊・フィナーレの届く音は間引いてまとめ、ボール大量ブロックの音は 1 フレームに 1 回にする。
+ * 1 フレームぶんのイベントの集計から、大量に起きる音（パドル・ハード・壊れないブロック・破壊・ボール大量ブロック）を鳴らす。
+ * パドル・ハード・壊れないブロック・破壊・フィナーレの届く音は間引いてまとめ、ボール大量ブロックの音は 1 フレームに 1 回にする。
  * どの音も、それを起こしたイベントがあったフレームでだけ鳴らす。
  * 勝敗が決まったら quiesce() で止め、それ以降は大量に起きる音を鳴らさない。
  */
@@ -37,6 +38,7 @@ export class SoundDirector {
   private readonly sfx: SfxPort;
   private readonly paddleThrottle = new SoundThrottle({ minInterval: 0.08, rateTau: 0.5, halfGainRate: 12, minGain: 0.3 });
   private readonly hardThrottle = new SoundThrottle({ minInterval: 0.05, rateTau: 0.5, halfGainRate: 15, minGain: 0.35 });
+  private readonly solidThrottle = new SoundThrottle({ minInterval: 0.06, rateTau: 0.5, halfGainRate: 15, minGain: 0.3 });
   private readonly breakThrottle = new SoundThrottle({ minInterval: BREAK_MIN_INTERVAL, rateTau: 0.35, halfGainRate: 250, minGain: 0.5 });
   private readonly bonusThrottle = new SoundThrottle({ minInterval: 0.04, rateTau: 0.3, halfGainRate: 25, minGain: 0.5 });
   /** 直前に鳴らした破壊音の音階の位置。chain が続く間は 1 音ごとに 1 つ上がる */
@@ -69,6 +71,9 @@ export class SoundDirector {
       sfx.hardHit(this.hardPendingRatio, hard, this.hardThrottle.gain);
       this.hardPendingRatio = 1;
     }
+
+    const solid = this.solidThrottle.update(ft.real, ft.realDt, s.solidCount);
+    if (solid > 0) sfx.solidHit(solid, this.solidThrottle.gain);
 
     // 破壊音: 1 音ごとに音階を 1 つ上げる。chain より先には進めないので、1 音が 1 回の破壊のときは chain と同じ高さになり、
     // chain が切れたら低い音へ戻る

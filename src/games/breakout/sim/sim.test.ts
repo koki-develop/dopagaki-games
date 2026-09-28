@@ -355,6 +355,85 @@ describe('ブロック', () => {
     expect(hits).toBeGreaterThan(100);
   });
 
+  test('壊れないブロックは跳ね返すだけで、壊れず、得点もボールも出さない。当たった点と跳ね返った向きを知らせる', () => {
+    const sim = makeSim(stageMode(emptyRows(10).concat([line(4, 'X'), line(COLS - 1, 'o')])));
+    const f = sim.blocks;
+    const idx = f.slotOf(1) * COLS + 4;
+    placeBall(sim, cellCenterX(4), f.centerY(1) - 1, 0, 1);
+    const hits: number[][] = [];
+    runSteps(sim, 60, () => {
+      const ev = sim.events;
+      expect(ev.counts[EventKind.BlockBreak] + ev.counts[EventKind.HardHit]).toBe(0);
+      for (let i = 0; i < ev.length; i++) if (ev.kind[i] === EventKind.SolidHit) hits.push([ev.x[i], ev.y[i], ev.a[i], ev.b[i]]);
+    });
+    expect(hits.length).toBe(1);
+    const [x, y, dx, dy] = hits[0];
+    // イベントの位置は Float32Array に入る
+    expect(x).toBeCloseTo(cellCenterX(4), 5);
+    expect(y).toBeCloseTo(f.rowBottomY(1) + BLOCK_INSET_Y, 5);
+    expect([dx, dy]).toEqual([0, -1]);
+    expect(f.type[idx]).toBe(BlockType.Solid);
+    expect(f.hitAt[idx]).toBeGreaterThan(0);
+    expect([f.liveCount, f.breakableCount]).toEqual([2, 1]);
+    expect(sim.score).toBe(0);
+    expect(sim.chain).toBe(0);
+    expect(sim.balls.count).toBe(1);
+    expect(sim.balls.dy[0]).toBeLessThan(0);
+  });
+
+  test('壊れないブロックの横の面に当たったときは、その面の上の点を知らせる', () => {
+    const sim = makeSim(stageMode(emptyRows(10).concat([line(4, 'X'), line(COLS - 1, 'o')])));
+    const f = sim.blocks;
+    const left = cellLeft(4) + BLOCK_INSET_X;
+    const a = 20 * DEG;
+    placeBall(sim, left - 0.5, f.centerY(1) - 0.5 * Math.tan(a), Math.cos(a), Math.sin(a));
+    const hits: number[][] = [];
+    runSteps(sim, 30, () => {
+      const ev = sim.events;
+      for (let i = 0; i < ev.length; i++) if (ev.kind[i] === EventKind.SolidHit) hits.push([ev.x[i], ev.y[i], ev.a[i]]);
+    });
+    expect(hits.length).toBe(1);
+    const [x, y, dx] = hits[0];
+    expect(x).toBeCloseTo(left, 5);
+    expect(y).toBeGreaterThan(f.rowBottomY(1) + BLOCK_INSET_Y);
+    expect(y).toBeLessThan(f.rowBottomY(1) + BLOCK_INSET_Y + BLOCK_H);
+    expect(dx).toBeLessThan(0);
+  });
+
+  test('壊れないブロックが入り組んでいても、最高速のボールはすり抜けず、中に入り込まず、壊れないブロックは残る', () => {
+    const rows = [
+      'X..X..X..X..',
+      '.X..X..X..X.',
+      '..X..X..X..X',
+      '............',
+      'XXX.XXXX.XXX',
+      '............',
+      '.XX..XX..XX.',
+      '.X........X.',
+      '...........o',
+    ];
+    const sim = makeSim(stageMode(rows), 5, (t) => {
+      t.ball.speedStart = t.ball.speedMax;
+      t.blocks.ballsFromBall = 0;
+    });
+    const f = sim.blocks;
+    const solids: number[] = [];
+    for (let i = 0; i < f.type.length; i++) if (f.type[i] === BlockType.Solid) solids.push(i);
+    for (let k = 0; k < 40; k++) {
+      const a = 0.35 + (k / 40) * (Math.PI - 0.7);
+      placeBall(sim, 0.3 + ((k * 0.37) % 8.4), 13 - (k % 5) * 0.4, Math.cos(a), Math.sin(a));
+    }
+    // o を壊すとすぐにクリアになり、その後はイベントを出さないので、当たった数は当たった時刻の更新で数える
+    let solidHits = 0;
+    runSteps(sim, 3000, () => {
+      for (const i of solids) if (f.hitAt[i] === Math.fround(sim.time)) solidHits++;
+      assertBallInvariants(sim);
+      assertNoBallInsideBlocks(sim);
+    });
+    expect(solidHits).toBeGreaterThan(200);
+    for (const i of solids) expect(f.type[i]).toBe(BlockType.Solid);
+  });
+
   test('ブロックに当たると version が増える', () => {
     const sim = makeSim(stageMode(emptyRows(10).concat([line(4, '3'), line(COLS - 1, 'o')])));
     const v0 = sim.blocks.version;
@@ -557,6 +636,40 @@ describe('ステージ', () => {
     expect(sy).toBeCloseTo(cy, 5);
   });
 
+  test('壊せるブロックがなくなればクリアになる。壊れないブロックは残っていてよい', () => {
+    const sim = makeSim(stageMode(emptyRows(10).concat(['XXXX......XX', line(2, 'o')])), 1, (t) => {
+      t.blocks.ballsFromBall = 0;
+    });
+    expect([sim.blocks.liveCount, sim.blocks.breakableCount]).toEqual([7, 1]);
+    placeBall(sim, cellCenterX(2), sim.blocks.centerY(0) - 1, 0, 1);
+    let signals = 0;
+    runSteps(sim, 60, () => {
+      signals |= sim.events.signals;
+    });
+    expect(signals & Signal.StageClear).toBeTruthy();
+    expect(sim.phase).toBe('cleared');
+    expect([sim.blocks.liveCount, sim.blocks.breakableCount]).toEqual([6, 0]);
+  });
+
+  test('クリアした後は、壊れないブロックに当たっても揺れの時刻だけを残し、イベントは出さない', () => {
+    const sim = makeSim(stageMode(emptyRows(10).concat([line(8, 'X'), line(2, 'o')])), 1, (t) => {
+      t.blocks.ballsFromBall = 0;
+    });
+    placeBall(sim, cellCenterX(2), sim.blocks.centerY(0) - 1, 0, 1);
+    runSteps(sim, 60);
+    expect(sim.phase).toBe('cleared');
+    clearBalls(sim);
+    const idx = sim.blocks.slotOf(1) * COLS + 8;
+    const before = sim.blocks.hitAt[idx];
+    placeBall(sim, cellCenterX(8), sim.blocks.centerY(1) - 1, 0, 1);
+    let solidHits = 0;
+    runSteps(sim, 60, () => {
+      solidHits += sim.events.counts[EventKind.SolidHit];
+    });
+    expect(solidHits).toBe(0);
+    expect(sim.blocks.hitAt[idx]).toBeGreaterThan(before);
+  });
+
   test('クリアの位置は、クリアより前のフレームで壊したブロックでは上書きされない', () => {
     const sim = makeSim(stageMode(emptyRows(10).concat([line(2, 'o'), line(9, 'o')])), 1, (t) => {
       t.blocks.ballsFromBall = 0;
@@ -587,7 +700,7 @@ describe('ステージ', () => {
     for (const s of STAGES) {
       for (const row of s.rows) {
         expect(row.length).toBe(COLS);
-        expect(/^[.oM2-9#%@]+$/.test(row)).toBe(true);
+        expect(/^[.oMX2-9#%@]+$/.test(row)).toBe(true);
       }
       const lowest = FIELD_H - s.rows.length * CELL_H;
       expect(lowest).toBeGreaterThan(DANGER_Y + 1);

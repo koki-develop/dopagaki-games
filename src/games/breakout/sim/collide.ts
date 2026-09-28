@@ -28,9 +28,12 @@ const HITS_PER_BALL = 8;
 /** 1 回の判定で集める接触の数の上限。ボールが同時に触れられるのは多くても 4 個 */
 const MAX_CONTACTS = 8;
 
-/** ブロックに当たったときの処理（得点、破壊、分裂）。dirX / dirY は当てたボールが跳ね返った向き */
+/**
+ * ブロックに当たったときの処理（得点、破壊、分裂）。
+ * dirX / dirY は当てたボールが跳ね返った向き、hitX / hitY はブロックの輪郭上の当たった点。
+ */
 export interface BlockHitHandler {
-  onBlockHit(index: number, row: number, col: number, dirX: number, dirY: number): void;
+  onBlockHit(index: number, row: number, col: number, dirX: number, dirY: number, hitX: number, hitY: number): void;
 }
 
 /**
@@ -84,6 +87,8 @@ export class Collider {
   private readonly contactCol = new Int32Array(MAX_CONTACTS);
   private readonly contactNx = new Float64Array(MAX_CONTACTS);
   private readonly contactNy = new Float64Array(MAX_CONTACTS);
+  private readonly contactX = new Float64Array(MAX_CONTACTS);
+  private readonly contactY = new Float64Array(MAX_CONTACTS);
   private readonly contactApproach = new Uint8Array(MAX_CONTACTS);
 
   constructor(balls: BallStore, field: BlockField, events: EventQueue, cfg: SimConfig, handler: BlockHitHandler) {
@@ -219,6 +224,9 @@ export class Collider {
           this.contactCol[contacts] = col;
           this.contactNx[contacts] = nx;
           this.contactNy[contacts] = ny;
+          // 押し出した後のボールの中心から、法線の逆へ半径ぶん戻った点が、ブロックの輪郭上の当たった点
+          this.contactX[contacts] = px - nx * R;
+          this.contactY[contacts] = py - ny * R;
           this.contactApproach[contacts] = b.dx[i] * nx + b.dy[i] * ny < 0 ? 1 : 0;
           contacts++;
         }
@@ -257,7 +265,7 @@ export class Collider {
       if (!this.contactApproach[k]) continue;
       const idx = this.contactIndex[k];
       if (!this.hits.first(i, idx)) continue;
-      this.handler.onBlockHit(idx, this.contactRow[k], this.contactCol[k], b.dx[i], b.dy[i]);
+      this.handler.onBlockHit(idx, this.contactRow[k], this.contactCol[k], b.dx[i], b.dy[i], this.contactX[k], this.contactY[k]);
     }
   }
 
@@ -337,7 +345,7 @@ export class Collider {
           if (y <= clearY) continue;
           y = clearY;
           pushed = true;
-          if (this.hits.first(i, idx)) this.handler.onBlockHit(idx, row, col, b.dx[i], -Math.abs(b.dy[i]));
+          if (this.hits.first(i, idx)) this.handler.onBlockHit(idx, row, col, b.dx[i], -Math.abs(b.dy[i]), x < bx0 ? bx0 : x > bx1 ? bx1 : x, by0);
         }
       }
       if (!pushed) continue;

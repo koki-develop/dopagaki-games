@@ -73,6 +73,21 @@ export class BreakoutSfx {
   }
 
   /**
+   * 壊れないブロックに当たる: 短く鈍い、詰まった金属の音。ハードの澄んだ響きと聞き分けられるよう、低く短くする。
+   * count はまとめた回数、gain は間引きによる 1 音の音量
+   */
+  solidHit(count: number, gain = 1): void {
+    const loud = Math.min(1.5, 1 + Math.log2(count) * 0.2);
+    const v = this.open(0.12, 0.45 * loud * gain);
+    if (!v) return;
+    const t = v.start;
+    const f = 260 * 2 ** (jitterCents(40) / 1200);
+    glide(tone(v, t, 'sine', f, 0.001, 0.07, 0.5).frequency, f * 0.7, t + 0.06);
+    tone(v, t, 'triangle', f * 2.31, 0.001, 0.035, 0.12);
+    noise(v, t, 'bandpass', rand(1300, 1700), 2, 0.001, 0.018, 0.22, Math.random());
+  }
+
+  /**
    * ブロックを壊す: ペンタトニックで上がる Shepard tone とクリック。
    * count はこの 1 音にまとめた破壊数で、音量と厚みを log スケールで増やす。gain は間引きによる 1 音の音量。
    * brightness（演出の強さ）が上がるほど音を短く明るくし、低音の塊を減らして、速く続けて鳴っても濁らないようにする。

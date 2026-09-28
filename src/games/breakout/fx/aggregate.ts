@@ -7,6 +7,7 @@ import type { EventQueue } from '../sim/events.ts';
 export const MAX_BREAK_FX = 48;
 export const MAX_DEBRIS_FX = 28;
 export const MAX_HARD_FX = 16;
+export const MAX_SOLID_FX = 16;
 export const MAX_OVERFLOW_FX = 24;
 /** ボール大量ブロックの弾ける演出を 1 フレームで出す数 */
 const MAX_MEGA_FX = 3;
@@ -31,10 +32,13 @@ export const FxFlag = {
   Wall: 32,
   /** 上限を超えたボールの光の筋 */
   Overflow: 64,
+  /** 壊れないブロックに当たった火花 */
+  SolidSpark: 128,
 } as const;
 
 /** 演出を付けるイベントの数の上限。どのイベントも一覧には 1 回しか入らない */
-export const FX_LIST_CAPACITY = MAX_BREAK_FX + MAX_MEGA_FX + MAX_HARD_FX + MAX_PADDLE_FX + MAX_WALL_FX + MAX_OVERFLOW_FX;
+export const FX_LIST_CAPACITY =
+  MAX_BREAK_FX + MAX_MEGA_FX + MAX_HARD_FX + MAX_SOLID_FX + MAX_PADDLE_FX + MAX_WALL_FX + MAX_OVERFLOW_FX;
 
 /**
  * 1 フレームぶんのイベントの集計。演出の側で 1 つ作って使い回す。
@@ -51,6 +55,8 @@ export class FrameSummary {
   /** ハードに当たった数（あふれた分も含む）と、残り HP の割合の最小値 */
   hardCount = 0;
   hardMinRatio = 1;
+  /** 壊れないブロックに当たった数（あふれた分も含む） */
+  solidCount = 0;
   /** パドルで打った数と打ち出した数の合計、最後に当たったパドル上の位置（-1〜1） */
   paddleCount = 0;
   paddleT = 0;
@@ -76,6 +82,7 @@ export function summarize(ev: EventQueue, budget: number, out: FrameSummary): Fr
   const breakLimit = Math.ceil(MAX_BREAK_FX * b);
   const debrisLimit = Math.ceil(MAX_DEBRIS_FX * b);
   const hardLimit = MAX_HARD_FX * b;
+  const solidLimit = MAX_SOLID_FX * b;
   const breakStride = breaks > breakLimit ? breaks / breakLimit : 1;
 
   out.breaks = breaks;
@@ -84,6 +91,7 @@ export function summarize(ev: EventQueue, budget: number, out: FrameSummary): Fr
   out.megaChain = 0;
   out.hardCount = ev.counts[EventKind.HardHit];
   out.hardMinRatio = 1;
+  out.solidCount = ev.counts[EventKind.SolidHit];
   out.paddleCount = 0;
   out.paddleT = 0;
   out.wallCount = ev.counts[EventKind.WallHit];
@@ -96,6 +104,7 @@ export function summarize(ev: EventQueue, budget: number, out: FrameSummary): Fr
   let breakFx = 0;
   let debrisFx = 0;
   let hardFx = 0;
+  let solidFx = 0;
   let overflowFx = 0;
   let wallFx = 0;
   let breakIdx = 0;
@@ -127,6 +136,11 @@ export function summarize(ev: EventQueue, budget: number, out: FrameSummary): Fr
       if (hardFx < hardLimit) {
         hardFx++;
         flags |= FxFlag.HardSpark;
+      }
+    } else if (kind === EventKind.SolidHit) {
+      if (solidFx < solidLimit) {
+        solidFx++;
+        flags |= FxFlag.SolidSpark;
       }
     } else if (kind === EventKind.PaddleHit) {
       out.paddleCount++;

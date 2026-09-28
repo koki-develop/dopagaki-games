@@ -25,3 +25,6 @@ export const BLOCK_HUE_SPAN = 0.36;
 export const blockHue = (yOverField: number): number => BLOCK_HUE_BOTTOM + yOverField * BLOCK_HUE_SPAN;
 
 export const HARD_RGB: readonly [number, number, number] = [1.0, 0.72, 0.3];
+
+/** 壊れないブロックの色。行の高さでは変えず、色味の薄い青みの鋼にする */
+export const SOLID_RGB: readonly [number, number, number] = [0.48, 0.56, 0.72];

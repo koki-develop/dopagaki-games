@@ -1,5 +1,5 @@
 import { BlockType, FIELD_H, FIELD_W } from '../config.ts';
-import { blockHue, HARD_RGB, neonRgb } from '../view/palette.ts';
+import { blockHue, HARD_RGB, neonRgb, SOLID_RGB } from '../view/palette.ts';
 import { ParticleShape } from './particle-shape.ts';
 import type { DebrisSpec, ParticleSpec } from './particle-shape.ts';
 
@@ -85,6 +85,12 @@ export class ParticleFx {
   /** ハードに当たった火花 */
   hardSparks(now: number, x: number, y: number, budget: number): void {
     this.sparks(now, x, y - 0.2, HARD_RGB[0], HARD_RGB[1], HARD_RGB[2], 3, 3.5, budget, Number.NaN);
+  }
+
+  /** 壊れないブロックに当たった火花。当たった点から、跳ね返ったボールの向き（dirX, dirY）へ散らす */
+  solidSparks(now: number, x: number, y: number, dirX: number, dirY: number, budget: number): void {
+    const k = 1.3;
+    this.sparks(now, x, y, SOLID_RGB[0] * k, SOLID_RGB[1] * k, SOLID_RGB[2] * k, 2, 3, budget, Math.atan2(dirY, dirX));
   }
 
   /** パドルで打った火花。上向きに散らし、色は背景の色相の反対側 */

@@ -15,6 +15,7 @@
  * - Overflow: 上限を超えて出てこられなかったボールの位置
  * - Launch: 打ち出した位置
  * - Drain: 奈落に落ちて失ったボールの、そのステップの終わりの位置（そのまま進んだとしたときの位置）, a, b = 速度（u/s）
+ * - SolidHit: 壊れないブロックの輪郭上の当たった点, a, b = 跳ね返ったボールの向き（単位ベクトル）
  */
 export const EventKind = {
   PaddleHit: 0,
@@ -24,9 +25,10 @@ export const EventKind = {
   Overflow: 4,
   Launch: 5,
   Drain: 6,
+  SolidHit: 7,
 } as const;
 export type EventKind = (typeof EventKind)[keyof typeof EventKind];
-export const EVENT_KIND_COUNT = 7;
+export const EVENT_KIND_COUNT = 8;
 
 export const Signal = {
   /** ボールが 0 個になった */

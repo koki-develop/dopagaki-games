@@ -29,7 +29,7 @@ import { InstanceBuffer, unitQuad } from '../../../engine/instanced.ts';
 import { drawCount } from '../../../engine/ring.ts';
 import { neon, sdRoundBox, sdSegment } from './tsl.ts';
 import { LOOK } from './look.ts';
-import { BLOCK_HUE_BOTTOM, BLOCK_HUE_SPAN } from './palette.ts';
+import { BLOCK_HUE_BOTTOM, BLOCK_HUE_SPAN, HARD_RGB, SOLID_RGB } from './palette.ts';
 import type { ViewUniforms } from './uniforms.ts';
 
 const CAPACITY = ROW_CAPACITY * COLS;
@@ -37,6 +37,8 @@ const CAPACITY = ROW_CAPACITY * COLS;
 const CELL_RANDOM = cellRandomTable(CAPACITY);
 /** 揺れや出現の拡大で矩形からはみ出す分の余白 */
 const PAD = 0.12;
+/** 壊れないブロックの斜めの縞の、1 本あたりの幅（ワールドの u）。縞はワールド座標で引き、並んだブロックの間でつながる */
+const SOLID_STRIPE_PITCH = 0.22;
 
 /**
  * ブロックの格子の読み取り口。version は、描画に使う内容（種類・HP・当たった時刻・出現時刻・行の位置）が
@@ -60,6 +62,7 @@ export type BlockSource = {
  * - ボール入り: 中に光るコアが 1 つ
  * - ハード: 内枠の二重線と、並んだ 2 つのコア。当たるたびにひびが入り、光が漏れる
  * - ボール大量: 3 × 2 の脈動するコアと、虹色の縁
+ * - 壊れない: コアのない鋼の板に、斜めの縞。行の高さで色を変えず、当たっても揺れず、盤面の揺れにも加わらない
  */
 export class BlocksView {
   readonly mesh: THREE.Mesh;
@@ -75,13 +78,21 @@ export class BlocksView {
     material.depthWrite = false;
     material.depthTest = false;
 
+    // 種類ごとに 1 か 0。種類は整数を float で渡しているので、前後 0.5 の幅で見分ける
+    const type = a.z;
+    const typeIs = (t: number) => step(t - 0.5, type).mul(step(type, t + 0.5));
+    const isHard = typeIs(BlockType.Hard);
+    const isMega = typeIs(BlockType.Mega);
+    const isSolid = typeIs(BlockType.Solid);
+    const movable = float(1).sub(isSolid);
+
     // 頂点: 出現の拡大と、当たったときの揺れ
     const hitAge = u.time.sub(b.x);
-    const wob = exp(hitAge.mul(-14)).mul(sin(hitAge.mul(55))).mul(0.16).mul(step(0, hitAge));
+    const wob = exp(hitAge.mul(-14)).mul(sin(hitAge.mul(55))).mul(0.16).mul(step(0, hitAge)).mul(movable);
     const bornAge = u.time.sub(b.y);
     const appear = clamp(bornAge.div(0.35), 0, 1);
     const appearScale = float(1).add(float(1.7).mul(appear.sub(1).pow(3))).add(float(0.7).mul(appear.sub(1).pow(2)));
-    const jiggle = sin(u.time.mul(47).add(b.z.mul(6.28))).mul(u.intensity).mul(0.025);
+    const jiggle = sin(u.time.mul(47).add(b.z.mul(6.28))).mul(u.intensity).mul(0.025).mul(movable);
     const size = vec2(BLOCK_W + PAD * 2, BLOCK_H + PAD * 2);
     // 種類 0 は使っていないインスタンスなので、大きさ 0 にして描かない
     const scale = vec2(float(1).add(wob), float(1).sub(wob)).mul(appearScale.max(0)).mul(step(0.5, a.z));
@@ -92,20 +103,22 @@ export class BlocksView {
       const p = uv().sub(0.5).mul(size).toVar();
       const half = vec2(BLOCK_W / 2, BLOCK_H / 2);
       const d = sdRoundBox(p, half, BLOCK_H * 0.18);
-      const type = a.z;
-      const isHard = step(1.5, type).mul(step(type, 2.5));
-      const isMega = step(2.5, type);
       const hp = a.w;
 
-      // 行の高さで色相を変える
+      // 行の高さで色相を変える（壊れないブロックは変えない）
       const hueT = a.y.div(FIELD_H).mul(BLOCK_HUE_SPAN).add(BLOCK_HUE_BOTTOM);
       const edgeHue = select(isMega.greaterThan(0.5), hueT.add(p.x.mul(0.35)).add(u.time.mul(0.5)), hueT);
-      const baseCol = mix(neon(edgeHue), vec3(1.0, 0.72, 0.3), isHard.mul(0.75));
+      const baseCol = mix(mix(neon(edgeHue), vec3(...HARD_RGB), isHard.mul(0.75)), vec3(...SOLID_RGB), isSolid);
 
       const edge = exp(abs(d).mul(-55)).mul(LOOK.block.edge).add(exp(abs(d).mul(-14)).mul(LOOK.block.edgeGlow));
       const body = smoothstep(0.01, -0.01, d);
       const col = baseCol.mul(edge).toVar();
-      col.addAssign(baseCol.mul(body).mul(LOOK.block.fill));
+      col.addAssign(baseCol.mul(body).mul(mix(float(LOOK.block.fill), float(LOOK.block.solidFill), isSolid)));
+
+      // 壊れない: 斜めの縞
+      const stripePhase = positionWorld.x.add(positionWorld.y).div(SOLID_STRIPE_PITCH).mul(Math.PI);
+      const stripe = smoothstep(0.35, 0.65, sin(stripePhase)).mul(isSolid);
+      col.addAssign(baseCol.mul(stripe.mul(LOOK.block.solidStripe).mul(body)));
 
       // ハード: 内枠
       const inner = sdRoundBox(p, half.sub(BLOCK_H * 0.19), BLOCK_H * 0.1);
@@ -135,8 +148,8 @@ export class BlocksView {
       // コア
       const pulse = sin(u.time.mul(4.5).add(b.z.mul(6.28))).mul(0.5).add(0.5);
       const coreR = float(BLOCK_H * 0.2);
-      // コアの数は、壊したときに出るボールの数に合わせる（ボール入り 1 つ、ハード 2 つ、ボール大量 6 つ）
-      const single = exp(p.length().div(coreR).pow(2).mul(-1.4)).mul(float(1).sub(isMega).sub(isHard));
+      // コアの数は、壊したときに出るボールの数に合わせる（ボール入り 1 つ、ハード 2 つ、ボール大量 6 つ、壊れない 0）
+      const single = exp(p.length().div(coreR).pow(2).mul(-1.4)).mul(float(1).sub(isMega).sub(isHard).sub(isSolid));
       const pair = exp(vec2(abs(p.x).sub(BLOCK_W * 0.16), p.y).length().div(coreR.mul(0.85)).pow(2).mul(-1.4)).mul(isHard);
       // ボール大量: 3 列 × 2 行の 6 つ
       const colD = min(abs(p.x), abs(abs(p.x).sub(BLOCK_W * 0.28)));
@@ -147,7 +160,8 @@ export class BlocksView {
 
       // 当たった直後は白く光る
       const hitFlash = exp(hitAge.mul(-22)).mul(step(0, hitAge));
-      col.addAssign(vec3(1, 1, 1.08).mul(LOOK.block.hitFlash).mul(hitFlash).mul(body.add(edge.mul(0.3))));
+      const hitFlashStrength = mix(float(LOOK.block.hitFlash), float(LOOK.block.solidHitFlash), isSolid);
+      col.addAssign(vec3(1, 1, 1.08).mul(hitFlashStrength).mul(hitFlash).mul(body.add(edge.mul(0.3))));
 
       // 天井より上（予備の行や、補充で落ちてくる途中の行）は天井の裏に隠す
       const belowCeiling = step(positionWorld.y, FIELD_H);

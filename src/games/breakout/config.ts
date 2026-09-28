@@ -30,13 +30,20 @@ export const BALL_CAP = 500;
 export const STEP_HZ = 120;
 export const STEP_DT = 1 / STEP_HZ;
 
+/** ブロックの種類。Solid（壊れないブロック）はボールを跳ね返すだけで、HP を持たず、ステージにだけ置く */
 export const BlockType = {
   Empty: 0,
   Ball: 1,
   Hard: 2,
   Mega: 3,
+  Solid: 4,
 } as const;
 export type BlockType = (typeof BlockType)[keyof typeof BlockType];
+
+/** 壊せるブロックの種類か。空きと Solid は壊せない */
+export function isBreakable(type: number): boolean {
+  return type !== BlockType.Empty && type !== BlockType.Solid;
+}
 
 /**
  * 調整用のパラメータ。開発ビルドの調整パネルから実行中に書き換えられるように、可変オブジェクトとして持つ。

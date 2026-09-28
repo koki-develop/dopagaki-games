@@ -5,6 +5,7 @@ import {
   CELL_W,
   COLS,
   GRID_LEFT,
+  isBreakable,
 } from '../config.ts';
 
 /** 行のリングバッファの容量。フィールドに並ぶ行数（最大でも約 47 行）より十分大きくする */
@@ -45,13 +46,16 @@ export interface ReadonlyBlockField {
   readonly hitAt: Float32Array;
   /** 出現した sim 時刻。出現の演出に使う */
   readonly bornAt: Float32Array;
-  /** リングバッファの枠ごとの、生きているブロックの数 */
+  /** リングバッファの枠ごとの、生きているブロック（壊れないブロックも含む）の数 */
   readonly rowLive: Uint8Array;
   readonly bottomSlot: number;
   readonly rowCount: number;
   /** 一番下の行の下端 y */
   readonly lowestRowY: number;
+  /** 生きているブロック（空きでないセル）の数。壊れないブロックも含む */
   readonly liveCount: number;
+  /** 壊せるブロックの数。ステージはこれが 0 になるとクリア */
+  readonly breakableCount: number;
   /** セルの中身（種類・HP・当たった時刻・出現時刻）か、格子の位置が変わるたびに増える */
   readonly version: number;
   slotOf(row: number): number;
@@ -80,6 +84,7 @@ export class BlockField implements ReadonlyBlockField {
   rowCount = 0;
   lowestRowY = 0;
   liveCount = 0;
+  breakableCount = 0;
   version = 0;
 
   slotOf(row: number): number {
@@ -157,6 +162,8 @@ export class BlockField implements ReadonlyBlockField {
     const slot = this.bottomSlot;
     this.liveCount -= this.rowLive[slot];
     this.rowLive[slot] = 0;
+    const base = slot * COLS;
+    for (let col = 0; col < COLS; col++) if (isBreakable(this.type[base + col])) this.breakableCount--;
     this.bottomSlot = (this.bottomSlot + 1) % ROW_CAPACITY;
     this.rowCount--;
     this.lowestRowY += CELL_H;
@@ -166,15 +173,21 @@ export class BlockField implements ReadonlyBlockField {
   clearAll(): void {
     this.rowCount = 0;
     this.liveCount = 0;
+    this.breakableCount = 0;
     this.bottomSlot = 0;
     this.rowLive.fill(0);
     this.version++;
   }
 
+  /** セルを置き直す。壊せるブロックの HP は 1〜255、空きと壊れないブロックの HP は 0 */
   setCell(row: number, col: number, type: BlockType, hp: number, now: number): void {
-    if (hp < 0 || hp > 255) throw new Error(`BlockField: hp ${hp} does not fit in 0..255`);
+    const breakable = isBreakable(type);
+    if (breakable && (hp < 1 || hp > 255)) throw new Error(`BlockField: hp ${hp} does not fit in 1..255`);
+    if (!breakable && hp !== 0) throw new Error(`BlockField: block type ${type} must have hp 0; got ${hp}`);
     const slot = this.slotOf(row);
     const i = slot * COLS + col;
+    if (isBreakable(this.type[i])) this.breakableCount--;
+    if (breakable) this.breakableCount++;
     const wasLive = this.type[i] !== BlockType.Empty;
     this.type[i] = type;
     this.hp[i] = hp;
@@ -190,8 +203,9 @@ export class BlockField implements ReadonlyBlockField {
     this.version++;
   }
 
-  /** セルの HP を 1 減らして残りを返す。0 になったら空にする（行と全体の生存数も更新する） */
+  /** 壊せるブロックの HP を 1 減らして残りを返す。0 になったら空にする（行と全体の生存数も更新する） */
   damageAt(index: number): number {
+    if (!isBreakable(this.type[index])) throw new Error(`BlockField: block type ${this.type[index]} cannot be damaged`);
     const hp = this.hp[index] - 1;
     if (hp > 0) {
       this.hp[index] = hp;
@@ -210,7 +224,9 @@ export class BlockField implements ReadonlyBlockField {
 
   /** セルの添字を空にする。行と全体の生存数も更新する */
   removeAt(index: number): void {
-    if (this.type[index] === BlockType.Empty) return;
+    const type = this.type[index];
+    if (type === BlockType.Empty) return;
+    if (isBreakable(type)) this.breakableCount--;
     this.type[index] = BlockType.Empty;
     this.hp[index] = 0;
     const slot = (index / COLS) | 0;

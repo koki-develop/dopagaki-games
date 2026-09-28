@@ -120,7 +120,7 @@ export class Director {
     this.previousBest = opts.previousBest;
     this.particles = new ParticleFx(ports.particles, ports.debris);
     this.sounds = new SoundDirector(ports.sfx);
-    this.atmosphere = new Atmosphere(ports.bgm, sim.blocks.liveCount);
+    this.atmosphere = new Atmosphere(ports.bgm, sim.blocks.breakableCount);
     this.newBest = new NewBest(opts.previousBest);
     const vibrate = (pattern: number | readonly number[]): void => ports.vibrate(pattern);
     this.peakDeps = { camera: opts.camera, sfx: ports.sfx, flashes: ports.flashes, atmosphere: this.atmosphere, vibrate };
@@ -201,6 +201,7 @@ export class Director {
       if (flags & FxFlag.Mega) particles.megaBurst(now, x, y, hue, budget);
       if (flags & FxFlag.Break) particles.blockBreak(now, x, y, ev.a[i], budget, (flags & FxFlag.Debris) !== 0);
       if (flags & FxFlag.HardSpark) particles.hardSparks(now, x, y, budget);
+      if (flags & FxFlag.SolidSpark) particles.solidSparks(now, x, y, ev.a[i], ev.b[i], budget);
       if (flags & FxFlag.PaddleSpark) particles.paddleSparks(now, x, y, hue, budget);
       if (flags & FxFlag.Wall) this.wallHit(now, y, ev.a[i], s.wallCount);
       if (flags & FxFlag.Overflow) particles.overflowStreak(now, x, y);

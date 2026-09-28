@@ -5,6 +5,7 @@ import { EventKind } from '../sim/events.ts';
 import { cellCenterX } from '../sim/blocks.ts';
 import { Sim } from '../sim/sim.ts';
 import { dropAllBalls, emptyRows, line, placeBall, simConfig, stageMode } from '../sim/sim.test-support.ts';
+import { SOLID_RGB } from '../view/palette.ts';
 import { LOOK } from '../view/look.ts';
 import { FINALE_HOLD, SHOCK_SPEED } from './finale.ts';
 import { createFxState, PRESENT_LONG_AGO } from './fx-state.ts';
@@ -13,7 +14,7 @@ import { GAME_OVER_FINISH } from './game-over.ts';
 import { clearingSim, Harness, losingSim } from './test-kit.test-support.ts';
 
 /** 大量に起きる（勝敗が決まったら止める）音 */
-const STREAM_SOUNDS = ['sfx.paddle', 'sfx.hardHit', 'sfx.breakNote', 'sfx.megaBurst'];
+const STREAM_SOUNDS = ['sfx.paddle', 'sfx.hardHit', 'sfx.solidHit', 'sfx.breakNote', 'sfx.megaBurst'];
 
 /** 1 フレームに n 個の破壊をイベント列へ足す */
 function injectBreaks(n: number, type: number = BlockType.Ball) {
@@ -501,6 +502,37 @@ describe('音の集約', () => {
 
 });
 
+describe('壊れないブロック', () => {
+  test('当たった点から火花を出し、音は間引いて鳴らす', () => {
+    const h = new Harness({ sim: losingSim() });
+    h.particles.keep = true;
+    h.beforeDirector = (sim) => {
+      for (let i = 0; i < 3; i++) sim.events.push(EventKind.SolidHit, 2.5, 9.25, 0, -1);
+    };
+    h.frame();
+    expect(h.particles.kept.length).toBe(6);
+    for (const p of h.particles.kept) {
+      expect([p.x, p.y]).toEqual([2.5, 9.25]);
+      expect(p.r).toBeCloseTo(SOLID_RGB[0] * 1.3, 6);
+    }
+    expect(h.rec.of('sfx.solidHit').map((c) => c.args[0])).toEqual([3]);
+    h.run(59);
+    const n = h.rec.count('sfx.solidHit');
+    expect(n).toBeGreaterThan(8);
+    expect(n).toBeLessThanOrEqual(Math.ceil(1 / 0.06) + 1);
+  });
+
+  test('BGM のライザーの基準は、プレイ開始時の壊せるブロックの数', () => {
+    // 壊れないブロックを基準に含めると、始まった直後から残りが 1 / 13 に見えて、ライザーが上がってしまう
+    const sim = new Sim({ mode: stageMode(emptyRows(10).concat(['X'.repeat(12), line(2, 'o')])), seed: 1, config: simConfig() });
+    const h = new Harness({ sim });
+    h.run(60);
+    const sent = h.rec.of('bgm.setRiser').map((c) => c.args[0]);
+    expect(sent.length).toBeGreaterThan(0);
+    for (const v of sent) expect(v).toBe(0);
+  });
+});
+
 describe('割り当て', () => {
   test('粒と破片の発生条件は、同じオブジェクトを使い回す', () => {
     const h = new Harness({ sim: losingSim() });
@@ -508,6 +540,7 @@ describe('割り当て', () => {
       injectBreaks(20)(sim);
       injectBreaks(2, BlockType.Mega)(sim);
       sim.events.push(EventKind.HardHit, 3, 12, 1, 2);
+      sim.events.push(EventKind.SolidHit, 3, 11, 0, -1);
       sim.events.push(EventKind.PaddleHit, 4, 1.8, 0.3, 0);
       sim.events.push(EventKind.Overflow, 4, 5, 0, 0);
     };
