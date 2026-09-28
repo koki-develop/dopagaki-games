@@ -1538,7 +1538,7 @@ export const STAGES: readonly StageDef[] = defineStages([
       '666666666666',
       '6M66666666M6',
       '666666666666',
-      '............',
+      'XXXX.XX.XXXX',
       '9o9o9oo9o9o9',
       'o9o9o99o9o9o',
       '............',
