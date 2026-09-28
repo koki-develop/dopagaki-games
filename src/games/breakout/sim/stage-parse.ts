@@ -7,7 +7,6 @@ import { BlockType, CELL_H, COLS, DANGER_Y, FIELD_H, isBreakable } from '../conf
  * - `.`: 空き
  * - `o`: ボール入り
  * - `2`〜`9`: ハード（数字が HP）
- * - `#` / `%` / `@`: ハード（HP 12 / 20 / 30）
  * - `M`: ボール大量
  * - `X`: 壊れないブロック
  *
@@ -24,12 +23,9 @@ export type StageDef = {
 /** ステージに並べられる行数の上限。一番下の行が危険ラインより上に収まる数 */
 export const STAGE_MAX_ROWS = Math.floor((FIELD_H - DANGER_Y) / CELL_H);
 
-const HARD_SYMBOLS: Readonly<Record<string, number>> = { '#': 12, '%': 20, '@': 30 };
-
 /** ステージの配置の文字から、ハードの HP を返す。ハードでなければ 0 */
 export function stageHardHp(ch: string): number {
-  if (ch.length === 1 && ch >= '2' && ch <= '9') return ch.charCodeAt(0) - 48;
-  return HARD_SYMBOLS[ch] ?? 0;
+  return ch.length === 1 && ch >= '2' && ch <= '9' ? ch.charCodeAt(0) - 48 : 0;
 }
 
 /** 読み込んだステージ。セルは上の行から順に `row * COLS + col` で並ぶ */
@@ -51,7 +47,7 @@ export class StageParseError extends Error {
 
 /**
  * ステージの配置を検証して、セルの種類と HP に展開する。
- * 行の幅・文字・行数・HP・ボールの届き方のどれかが合わなければ、どこが違うかを書いた `StageParseError` を投げる。
+ * 行の幅・文字・行数・ボールの届き方のどれかが合わなければ、どこが違うかを書いた `StageParseError` を投げる。
  */
 export function parseStage(def: StageDef): ParsedStage {
   const id = def.id;
@@ -82,9 +78,8 @@ export function parseStage(def: StageDef): ParsedStage {
       } else {
         const h = stageHardHp(ch);
         if (h === 0) {
-          throw new StageParseError(id, `row ${r + 1} column ${col + 1} has unknown symbol "${ch}"; allowed: . o M X 2-9 # % @`);
+          throw new StageParseError(id, `row ${r + 1} column ${col + 1} has unknown symbol "${ch}"; allowed: . o M X 2-9`);
         }
-        if (h > 255) throw new StageParseError(id, `row ${r + 1} column ${col + 1} has HP ${h}; at most 255`);
         type[i] = BlockType.Hard;
         hp[i] = h;
       }

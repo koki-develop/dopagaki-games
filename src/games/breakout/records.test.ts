@@ -12,7 +12,7 @@ import {
 import type { StorageEventSource } from './records.ts';
 import type { RunResult } from './types.ts';
 
-const IDS = ['ignition', 'floodgate', 'circuit', 'prism', 'fortress'] as const;
+const IDS = ['warmup', 'stripes', 'checker', 'pyramid', 'deluge'] as const;
 
 type Mem = StorageLike & { mem: Map<string, string> };
 
@@ -52,17 +52,17 @@ const result = (mode: RunResult['mode'], score: number, cleared = false): RunRes
 describe('sanitizeRecords', () => {
   test('壊れた値・型違い・負数・NaN・桁あふれは 0 にする', () => {
     const r = sanitizeRecords(
-      { bestEndless: -5, bestStage: { ignition: 'x', floodgate: Number.NaN, circuit: 1e300, prism: 12.7, fortress: Infinity }, stagesCleared: 2.9 },
+      { bestEndless: -5, bestStage: { warmup: 'x', stripes: Number.NaN, checker: 1e300, pyramid: 12.7, deluge: Infinity }, stagesCleared: 2.9 },
       IDS,
     );
     expect(r.bestEndless).toBe(0);
-    expect(r.bestStage).toEqual({ ignition: 0, floodgate: 0, circuit: 0, prism: 12, fortress: 0 });
+    expect(r.bestStage).toEqual({ warmup: 0, stripes: 0, checker: 0, pyramid: 12, deluge: 0 });
     expect(r.stagesCleared).toBe(2);
   });
 
   test('知らないステージは捨て、足りないステージは 0 で埋める', () => {
-    const r = sanitizeRecords({ bestEndless: 10, bestStage: { ignition: 5, bonus: 99 }, stagesCleared: 1 }, IDS);
-    expect(r.bestStage).toEqual({ ignition: 5, floodgate: 0, circuit: 0, prism: 0, fortress: 0 });
+    const r = sanitizeRecords({ bestEndless: 10, bestStage: { warmup: 5, bonus: 99 }, stagesCleared: 1 }, IDS);
+    expect(r.bestStage).toEqual({ warmup: 5, stripes: 0, checker: 0, pyramid: 0, deluge: 0 });
   });
 
   test('クリア数はステージ数を超えない', () => {
@@ -81,7 +81,7 @@ describe('applyResult', () => {
     expect(r.bestEndless).toBe(500);
     r = applyResult(r, result({ kind: 'stage', index: 0 }, 40), IDS);
     r = applyResult(r, result({ kind: 'stage', index: 0 }, 20), IDS);
-    expect(r.bestStage.ignition).toBe(40);
+    expect(r.bestStage.warmup).toBe(40);
   });
 
   test('クリア数が進むのは、最前線のステージをクリアしたときだけ', () => {
@@ -111,9 +111,9 @@ describe('applyResult', () => {
 
 describe('mergeRecords', () => {
   test('項目ごとの大きいほうを取る', () => {
-    const a = { bestEndless: 10, bestStage: { ...emptyRecords(IDS).bestStage, ignition: 5 }, stagesCleared: 2 };
-    const b = { bestEndless: 3, bestStage: { ...emptyRecords(IDS).bestStage, ignition: 1, prism: 9 }, stagesCleared: 1 };
-    expect(mergeRecords(a, b, IDS)).toEqual({ bestEndless: 10, bestStage: { ignition: 5, floodgate: 0, circuit: 0, prism: 9, fortress: 0 }, stagesCleared: 2 });
+    const a = { bestEndless: 10, bestStage: { ...emptyRecords(IDS).bestStage, warmup: 5 }, stagesCleared: 2 };
+    const b = { bestEndless: 3, bestStage: { ...emptyRecords(IDS).bestStage, warmup: 1, pyramid: 9 }, stagesCleared: 1 };
+    expect(mergeRecords(a, b, IDS)).toEqual({ bestEndless: 10, bestStage: { warmup: 5, stripes: 0, checker: 0, pyramid: 9, deluge: 0 }, stagesCleared: 2 });
   });
 });
 
@@ -121,6 +121,11 @@ describe('createRecordsStore', () => {
   test('壊れた JSON は空の記録として読む', () => {
     const s = createRecordsStore({ storage: memoryStorage({ [RECORDS_KEY]: '{not json' }), stageIds: IDS });
     expect(s.get()).toEqual(emptyRecords(IDS));
+  });
+
+  test('版 1 の記録は読まない', () => {
+    const storage = memoryStorage({ [RECORDS_KEY]: JSON.stringify({ v: 1, bestEndless: 42, bestStage: { warmup: 10 }, stagesCleared: 3 }) });
+    expect(createRecordsStore({ storage, stageIds: IDS }).get()).toEqual(emptyRecords(IDS));
   });
 
   test('保存先がなくても使える', () => {
@@ -134,16 +139,16 @@ describe('createRecordsStore', () => {
     const a = createRecordsStore({ storage, stageIds: IDS });
     a.commit(result({ kind: 'stage', index: 0 }, 80, true));
     expect(JSON.parse(storage.mem.get(RECORDS_KEY) ?? 'null')).toEqual({
-      v: 1,
+      v: 2,
       bestEndless: 0,
-      bestStage: { ignition: 80, floodgate: 0, circuit: 0, prism: 0, fortress: 0 },
+      bestStage: { warmup: 80, stripes: 0, checker: 0, pyramid: 0, deluge: 0 },
       stagesCleared: 1,
     });
     expect(createRecordsStore({ storage, stageIds: IDS }).get()).toEqual(a.get());
   });
 
   test('容量が一杯でも、保存済みの記録は読める', () => {
-    const base = memoryStorage({ [RECORDS_KEY]: JSON.stringify({ v: 1, bestEndless: 42, bestStage: {}, stagesCleared: 0 }) });
+    const base = memoryStorage({ [RECORDS_KEY]: JSON.stringify({ v: 2, bestEndless: 42, bestStage: {}, stagesCleared: 0 }) });
     const full: StorageLike = {
       getItem: base.getItem,
       setItem: () => {
@@ -165,7 +170,7 @@ describe('createRecordsStore', () => {
 
     a.commit(result({ kind: 'stage', index: 0 }, 100, true));
     expect(notified).toBe(1);
-    expect(b.get().bestStage.ignition).toBe(100);
+    expect(b.get().bestStage.warmup).toBe(100);
     expect(b.get().stagesCleared).toBe(1);
 
     // b の手元の値が古くても、保存の直前に保存先と合わせる
@@ -174,8 +179,8 @@ describe('createRecordsStore', () => {
     b.commit(result({ kind: 'stage', index: 1 }, 50, true));
     const saved = createRecordsStore({ storage: { getItem: (k) => mem.get(k) ?? null, setItem: () => {} }, stageIds: IDS }).get();
     expect(saved.bestEndless).toBe(900);
-    expect(saved.bestStage.ignition).toBe(100);
-    expect(saved.bestStage.floodgate).toBe(50);
+    expect(saved.bestStage.warmup).toBe(100);
+    expect(saved.bestStage.stripes).toBe(50);
     expect(saved.stagesCleared).toBe(2);
   });
 

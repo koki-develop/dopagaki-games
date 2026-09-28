@@ -159,7 +159,7 @@ export default function BreakoutScreen() {
         />
       )}
 
-      {phase.k === 'ready' && <ReadyView mode={phase.mode} onStart={() => dispatch({ t: 'start' })} />}
+      {phase.k === 'ready' && <ReadyView mode={phase.mode} best={records.bestFor(phase.mode)} onStart={() => dispatch({ t: 'start' })} />}
 
       {phase.k === 'paused' && (
         <PauseView

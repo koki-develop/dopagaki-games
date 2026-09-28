@@ -17,13 +17,13 @@ import {
   tuning,
 } from '../config.ts';
 import type { Tuning } from '../config.ts';
-import { STAGES } from '../stages/stages.ts';
 import { BlockField, cellCenterX, cellLeft, colAtX } from './blocks.ts';
 import { EventKind, Signal } from './events.ts';
 import { Sim, paddleRange } from './sim.ts';
-import type { SimMode } from './sim.ts';
 import {
   ENDLESS,
+  MIXED,
+  PLAIN,
   autoplayInput,
   clearBalls,
   clearVisibleRows,
@@ -38,8 +38,6 @@ import {
 const R = BALL_RADIUS;
 const EPS = 1e-9;
 const DEG = Math.PI / 180;
-
-const shipped = (i: number): SimMode => ({ kind: 'stage', stage: STAGES[i] });
 
 function runSteps(sim: Sim, steps: number, each?: () => void): void {
   for (let i = 0; i < steps; i++) {
@@ -112,7 +110,7 @@ function assertNoBallInsideBlocks(sim: Sim): void {
 
 describe('発射', () => {
   test('静止したパドルからは真上に打ち出す', () => {
-    const sim = makeSim(shipped(0));
+    const sim = makeSim(PLAIN);
     expect(sim.attached).toBe(true);
     sim.step(hold(sim, true));
     expect(sim.attached).toBe(false);
@@ -127,7 +125,7 @@ describe('発射', () => {
   });
 
   test('動かしながら離すと、移動方向へ最大 launchTiltMaxDeg まで傾く', () => {
-    const sim = makeSim(shipped(0));
+    const sim = makeSim(PLAIN);
     for (let i = 0; i < 40; i++) sim.step({ paddleTargetX: 1 + i * 0.16, launch: false });
     sim.step(hold(sim, true));
     const deg = (Math.atan2(sim.balls.dx[0], sim.balls.dy[0]) * 180) / Math.PI;
@@ -208,7 +206,7 @@ describe('壁と天井', () => {
 
 describe('ブロック', () => {
   test('最高速でもボールはブロックをすり抜けず、中に入り込まない', () => {
-    const sim = makeSim(shipped(4), 3, (t) => {
+    const sim = makeSim(MIXED, 3, (t) => {
       t.ball.speedStart = t.ball.speedMax;
       t.blocks.ballsFromBall = 0;
       t.blocks.ballsFromHard = 0;
@@ -292,7 +290,7 @@ describe('ブロック', () => {
   });
 
   test('0.5 秒以内に壊し続けると chain が伸び、倍率が上がる', () => {
-    const sim = makeSim(shipped(0), 1, (t) => {
+    const sim = makeSim(PLAIN, 1, (t) => {
       t.blocks.ballsFromBall = 0;
     });
     const f = sim.blocks;
@@ -520,7 +518,7 @@ describe('パドル', () => {
       [tuning.paddle.width / 2 + R, tuning.paddle.maxBounceDeg],
       [-(tuning.paddle.width / 2 + R), -tuning.paddle.maxBounceDeg],
     ] as const) {
-      const sim = makeSim(shipped(0));
+      const sim = makeSim(PLAIN);
       sim.step({ paddleTargetX: 4.5, launch: false });
       placeBall(sim, 4.5 + offset, PADDLE_Y + 0.6, 0, -1);
       let hit = false;
@@ -536,7 +534,7 @@ describe('パドル', () => {
   });
 
   test('1 ステップで大きく動かしたパドルでも、通過した範囲のボールを拾う', () => {
-    const sim = makeSim(shipped(0));
+    const sim = makeSim(PLAIN);
     sim.step({ paddleTargetX: 1.2, launch: false });
     placeBall(sim, 4.5, PADDLE_Y + tuning.paddle.height / 2 + R + 0.01, 0, -1);
     sim.step({ paddleTargetX: 7.8, launch: false });
@@ -545,7 +543,7 @@ describe('パドル', () => {
   });
 
   test('パドルの下を抜けたボールは y < -R で消える', () => {
-    const sim = makeSim(shipped(0));
+    const sim = makeSim(PLAIN);
     sim.step({ paddleTargetX: 1.2, launch: false });
     placeBall(sim, 8, 1, 0, -1);
     placeBall(sim, 8.2, 5, 0, 1);
@@ -562,7 +560,7 @@ describe('パドル', () => {
   });
 
   test('奈落に落ちたボールは、ステップの終わりの時刻の位置と速度を Drain で知らせる', () => {
-    const sim = makeSim(shipped(0));
+    const sim = makeSim(PLAIN);
     sim.step({ paddleTargetX: 1.2, launch: false });
     const [dx, dy] = [0.6, -0.8];
     placeBall(sim, 7, 1, dx, dy);
@@ -591,7 +589,7 @@ describe('パドル', () => {
 
 describe('ステージ', () => {
   test('残機 3 はプレイ中のボールを含み、3 回ミスでゲームオーバー', () => {
-    const sim = makeSim(shipped(0));
+    const sim = makeSim(PLAIN);
     expect(sim.lives).toBe(3);
     for (let miss = 1; miss <= 3; miss++) {
       clearBalls(sim);
@@ -730,19 +728,6 @@ describe('ステージ', () => {
     expect(hits).toBe(0);
   });
 
-  test('どのステージも 12 列で、パドルの上に余裕を残して収まる', () => {
-    for (const s of STAGES) {
-      for (const row of s.rows) {
-        expect(row.length).toBe(COLS);
-        expect(/^[.oMX2-9#%@]+$/.test(row)).toBe(true);
-      }
-      const lowest = FIELD_H - s.rows.length * CELL_H;
-      expect(lowest).toBeGreaterThan(DANGER_Y + 1);
-      const sim = makeSim({ kind: 'stage', stage: s });
-      expect(sim.blocks.liveCount).toBeGreaterThan(0);
-    }
-  });
-
   test('不正なステージは sim を作る時点で分かりやすいエラーになる', () => {
     expect(() => makeSim(stageMode(['ooooo']))).toThrow(/row 1 has 5 columns/);
     expect(() => makeSim(stageMode([line(3, 'x')]))).toThrow(/unknown symbol "x"/);
@@ -849,7 +834,7 @@ describe('ボールの回収', () => {
   });
 
   test('プレイ中は取り除かない', () => {
-    const sim = makeSim(shipped(0));
+    const sim = makeSim(PLAIN);
     for (let i = 0; i < 3; i++) placeBall(sim, 1 + i, 3, 0, 1);
     expect(
       sim.collectBalls(

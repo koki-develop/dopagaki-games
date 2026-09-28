@@ -1,7 +1,6 @@
 import { selectableStages } from '../../games/breakout/records.ts';
 import type { Records } from '../../games/breakout/records.ts';
-import { formatScore } from '../../games/breakout/hud/format.ts';
-import { STAGES } from '../../games/breakout/stages/stages.ts';
+import { STAGES, isMilestoneStage } from '../../games/breakout/stages/stages.ts';
 import Overlay from '../ui/Overlay.tsx';
 
 type Props = {
@@ -10,7 +9,10 @@ type Props = {
   onBack: () => void;
 };
 
-/** ステージ選択。ステージを縦一列に並べる。クリア済みのステージと、その次のステージを選べる */
+/**
+ * ステージ選択。番号のタイルを 5 列の格子に並べるので、節目の面（5 の倍数）は右端の列にそろう。
+ * クリア済みのステージと、その次のステージを選べる。開いたときは次に遊ぶステージにフォーカスを当て、そこまでスクロールする。
+ */
 export default function StageSelectView({ records, onChoose, onBack }: Props) {
   const open = selectableStages(records, STAGES.length);
   return (
@@ -22,23 +24,25 @@ export default function StageSelectView({ records, onChoose, onBack }: Props) {
       }
     >
       <h2 className="screen-title">STAGE</h2>
-      <ol className="stage-list">
+      <ol className="stage-grid">
         {STAGES.map((s, i) => {
+          const no = i + 1;
           const locked = i >= open;
           const cleared = i < records.stagesCleared;
+          const state = locked ? 'locked' : cleared ? 'cleared' : 'next';
           return (
             <li key={s.id}>
               <button
                 type="button"
-                className="stage-row"
+                className="stage-tile"
                 disabled={locked}
-                data-cleared={cleared}
+                data-state={state}
+                data-milestone={isMilestoneStage(i)}
+                autoFocus={i === open - 1}
                 onClick={() => onChoose(i)}
-                aria-label={locked ? `ステージ ${i + 1}（未解放）` : `ステージ ${i + 1} ${s.name}`}
+                aria-label={locked ? `ステージ ${no}（未解放）` : `ステージ ${no} ${s.name}${cleared ? '（クリア済み）' : ''}`}
               >
-                <span className="stage-row-no">{i + 1}</span>
-                <span className="stage-row-name">{locked ? 'LOCKED' : s.name}</span>
-                <span className="stage-row-meta">{locked ? '' : cleared ? `BEST ${formatScore(records.bestStage[s.id] ?? 0)}` : 'NEW'}</span>
+                {no}
               </button>
             </li>
           );

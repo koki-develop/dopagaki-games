@@ -12,8 +12,11 @@ export type Records = {
 };
 
 export const RECORDS_KEY = 'dopagaki:breakout:records';
-/** 保存する形式の版。形式を変えるときは上げて、読み込みで前の版から移す */
-const VERSION = 1;
+/**
+ * 保存する形式の版。形式を変えるときは上げて、読み込みで前の版から移す。
+ * 版 1 は別のステージ構成でのクリア数を持つので、移さずに捨てる。
+ */
+const VERSION = 2;
 
 type Envelope = { v: typeof VERSION; bestEndless: number; bestStage: Record<string, number>; stagesCleared: number };
 

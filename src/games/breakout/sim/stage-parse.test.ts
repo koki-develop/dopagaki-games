@@ -5,33 +5,31 @@ import { STAGE_MAX_ROWS, StageParseError, parseStage, stageHardHp } from './stag
 const row = (s: string) => s + '.'.repeat(COLS - s.length);
 
 describe('stageHardHp', () => {
-  test('数字は HP、記号は 12 / 20 / 30、それ以外はハードではない', () => {
+  test('2〜9 の数字は HP、それ以外はハードではない', () => {
     for (let d = 2; d <= 9; d++) expect(stageHardHp(String(d))).toBe(d);
-    expect(stageHardHp('#')).toBe(12);
-    expect(stageHardHp('%')).toBe(20);
-    expect(stageHardHp('@')).toBe(30);
-    for (const ch of ['0', '1', 'o', 'M', 'X', '.', '', '22', 'x']) expect(stageHardHp(ch)).toBe(0);
+    for (const ch of ['0', '1', 'o', 'M', 'X', '.', '', '22', 'x', '#', '%', '@']) expect(stageHardHp(ch)).toBe(0);
   });
 });
 
 describe('parseStage', () => {
   test('文字をセルの種類と HP に展開する', () => {
-    const p = parseStage({ id: 'demo', name: 'DEMO', rows: [row('o3MX'), row('.@')] });
+    const p = parseStage({ id: 'demo', name: 'DEMO', rows: [row('o3MX'), row('.9')] });
     expect(p.rowCount).toBe(2);
     expect(p.breakableCount).toBe(4);
     expect(Array.from(p.type.subarray(0, 4))).toEqual([BlockType.Ball, BlockType.Hard, BlockType.Mega, BlockType.Solid]);
     expect(Array.from(p.hp.subarray(0, 4))).toEqual([1, 3, 1, 0]);
     expect(p.type[COLS]).toBe(BlockType.Empty);
     expect(p.type[COLS + 1]).toBe(BlockType.Hard);
-    expect(p.hp[COLS + 1]).toBe(30);
+    expect(p.hp[COLS + 1]).toBe(9);
   });
 
   test('配置の誤りは、ステージと位置を示すエラーになる', () => {
     const bad = (rows: string[], id = 'bad') => () => parseStage({ id, name: 'BAD', rows });
     expect(bad(['o'.repeat(COLS + 1)])).toThrow(StageParseError);
     expect(bad(['o'.repeat(COLS + 1)])).toThrow('stage "bad": row 1 has 13 columns; expected 12');
-    expect(bad([row('o'), row('ox')])).toThrow('row 2 column 2 has unknown symbol "x"; allowed: . o M X 2-9 # % @');
+    expect(bad([row('o'), row('ox')])).toThrow('row 2 column 2 has unknown symbol "x"; allowed: . o M X 2-9');
     expect(bad([row('1')])).toThrow('unknown symbol "1"');
+    expect(bad([row('#')])).toThrow('unknown symbol "#"');
     expect(bad([])).toThrow('has no rows');
     expect(bad([row('')])).toThrow('has no breakable blocks');
     expect(bad([row('XXX')])).toThrow('has no breakable blocks');

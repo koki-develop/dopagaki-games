@@ -756,62 +756,50 @@ p {
 
 /* ステージ選択 */
 
-.stage-list {
+/* 5 列の格子。節目の面（5 の倍数）は右端の列にそろい、地の色で見分ける */
+.stage-grid {
   list-style: none;
   margin: 0;
   padding: 0;
   width: 100%;
   display: grid;
-  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
 }
 
-.stage-row {
+.stage-tile {
   width: 100%;
-  min-height: 64px;
+  min-height: var(--touch-sm);
+  aspect-ratio: 1;
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  border-radius: var(--radius-lg);
+  place-items: center;
+  border-radius: var(--radius);
   border: 2px solid rgb(var(--magenta-rgb) / 0.7);
   background: rgb(var(--bg-rgb) / 0.7);
-  text-align: left;
+  font-family: var(--display);
+  font-size: clamp(18px, 5.5vw, 26px);
   transition: transform 0.08s ease;
 }
 
-.stage-row:active {
-  transform: translateY(2px);
+.stage-tile[data-milestone='true'] {
+  background: rgb(var(--magenta-rgb) / 0.22);
 }
 
-.stage-row:disabled {
-  opacity: 0.4;
-}
-
-.stage-row[data-cleared='true'] {
+.stage-tile[data-state='cleared'] {
   border-color: var(--gold);
 }
 
-.stage-row-no {
-  font-family: var(--display);
-  font-size: 26px;
-  text-align: center;
+.stage-tile[data-state='next'] {
+  border-color: var(--cyan);
+  box-shadow: 0 0 12px rgb(var(--cyan-rgb) / 0.5);
 }
 
-.stage-row-name {
-  font-family: var(--display);
-  font-size: 16px;
-  letter-spacing: 0.08em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.stage-tile:active {
+  transform: translateY(2px);
 }
 
-.stage-row-meta {
-  font-family: var(--display);
-  font-size: 11px;
-  color: var(--gold);
-  white-space: nowrap;
+.stage-tile:disabled {
+  opacity: 0.35;
 }
 
 /* タップしてスタート */
@@ -831,6 +819,12 @@ p {
   letter-spacing: 0.3em;
   margin-right: -0.3em;
   color: var(--muted);
+}
+
+.ready-best {
+  font-family: var(--display);
+  font-size: 13px;
+  color: var(--gold);
 }
 
 .ready-cta {

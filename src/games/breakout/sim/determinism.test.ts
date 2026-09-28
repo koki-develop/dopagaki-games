@@ -1,9 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import { STEP_HZ, sanitizeTuning, tuning } from '../config.ts';
-import { STAGES } from '../stages/stages.ts';
 import { Sim } from './sim.ts';
 import type { SimInput, SimMode } from './sim.ts';
-import { autoplayInput } from './sim.test-support.ts';
+import { MIXED, PLAIN, autoplayInput } from './sim.test-support.ts';
 
 const config = sanitizeTuning(tuning);
 
@@ -70,15 +69,15 @@ describe('決定性', () => {
     expect(sim.time).toBeCloseTo(1376 / STEP_HZ, 9);
   });
 
-  test('既知の入力列の結果（ステージ 5 をクリア）', () => {
-    const { sim, steps } = play({ kind: 'stage', stage: STAGES[4] }, 7, 12000, autoplayInput);
-    expect(steps).toBe(1569);
+  test('既知の入力列の結果（ステージをクリア）', () => {
+    const { sim, steps } = play(MIXED, 7, 12000, autoplayInput);
+    expect(steps).toBe(1491);
     expect(sim.phase).toBe('cleared');
-    expect(sim.score).toBe(28689);
+    expect(sim.score).toBe(24360);
     expect(sim.ballCount).toBe(375);
     expect(sim.clearBonusRemaining).toBe(375);
     expect(sim.lives).toBe(3);
-    expect(sim.time).toBeCloseTo(1569 / STEP_HZ, 9);
+    expect(sim.time).toBeCloseTo(1491 / STEP_HZ, 9);
   });
 });
 
@@ -90,7 +89,7 @@ describe('発射角と描画のフレームレート', () => {
    * interpolate が false なら、フレームの移動をすべて最初のステップで反映する。
    */
   function launchDeg(hz: number, interpolate: boolean): number {
-    const sim = new Sim({ mode: { kind: 'stage', stage: STAGES[0] }, seed: 1, config });
+    const sim = new Sim({ mode: PLAIN, seed: 1, config });
     const stepsPerFrame = STEP_HZ / hz;
     const start = sim.paddleX;
     const speed = 6;

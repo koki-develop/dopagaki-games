@@ -29,6 +29,31 @@ export const emptyRows = (n: number): string[] => Array.from({ length: n }, () =
 export const line = (col: number, ch: string): string => '.'.repeat(col) + ch + '.'.repeat(COLS - col - 1);
 export const stageMode = (rows: string[]): SimMode => ({ kind: 'stage', stage: { id: 'test', name: 'TEST', rows } });
 
+/** 上に 3 行の空きを残し、その下をボール入りで埋めた盤面。一番下の行は左端から右端までボール入り */
+export const PLAIN: SimMode = stageMode(emptyRows(3).concat(Array.from({ length: 17 }, () => 'o'.repeat(COLS))));
+
+/** ボール入り・ハード（HP 6 / 7 / 9）・ボール大量を混ぜた、ぎっしり詰まった盤面 */
+export const MIXED: SimMode = stageMode([
+  ...emptyRows(3),
+  '999999999999',
+  '977777777779',
+  '97MMMMMMMM79',
+  '97MMMMMMMM79',
+  '977777777779',
+  '99999oo99999',
+  'ooooMooMoooo',
+  'oooooooooooo',
+  '6o6o6o6o6o6o',
+  'oooooooooooo',
+  'o6o6o6o6o6o6',
+  'oooooooooooo',
+  '99oooooooo99',
+  'ooooMooMoooo',
+  'oooooooooooo',
+  'oooooooooooo',
+  'oooooooooooo',
+]);
+
 /** パドルをいまの位置に置いたままにする入力 */
 export const hold = (sim: Sim, launch = false): SimInput => ({ paddleTargetX: sim.paddleX, launch });
 
