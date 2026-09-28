@@ -91,7 +91,7 @@ export const tuning = {
     hardHpScaleSeconds: 30,
     hardHpPower: 1.7,
     /** ハードの HP の上限。これより硬いブロックは作らない */
-    hardHpMax: 12,
+    hardHpMax: 24,
     /** 全消しの直後に天井の外から落とし入れる行数 */
     refillRows: 12,
     refillDropSeconds: 0.45,
