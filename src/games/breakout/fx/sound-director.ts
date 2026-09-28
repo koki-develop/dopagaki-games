@@ -10,6 +10,7 @@ export type SfxPort = Pick<
   | 'paddle'
   | 'hardHit'
   | 'solidHit'
+  | 'solidShatter'
   | 'breakNote'
   | 'megaBurst'
   | 'ballsZero'
@@ -41,6 +42,7 @@ export class SoundDirector {
   private readonly solidThrottle = new SoundThrottle({ minInterval: 0.06, rateTau: 0.5, halfGainRate: 15, minGain: 0.3 });
   private readonly breakThrottle = new SoundThrottle({ minInterval: BREAK_MIN_INTERVAL, rateTau: 0.35, halfGainRate: 250, minGain: 0.5 });
   private readonly bonusThrottle = new SoundThrottle({ minInterval: 0.04, rateTau: 0.3, halfGainRate: 25, minGain: 0.5 });
+  private readonly shatterThrottle = new SoundThrottle({ minInterval: 0.05, rateTau: 0.3, halfGainRate: 20, minGain: 0.5 });
   /** 直前に鳴らした破壊音の音階の位置。chain が続く間は 1 音ごとに 1 つ上がる */
   private breakStep = -1;
   /** まだ鳴らしていないハードの当たりのうち、残り HP の割合の最小値 */
@@ -95,5 +97,14 @@ export class SoundDirector {
     if (n === 0) return;
     const gain = Math.min(1.1, 0.35 + 0.15 * Math.log2(1 + n)) * this.bonusThrottle.gain;
     this.sfx.bonusNote(collected % BONUS_STEPS, gain);
+  }
+
+  /**
+   * フィナーレで壊れないブロックが砕けた。shattered はこのフレームに砕けた数。
+   * 回収の間は、砕けなかったフレームも 0 を渡して毎フレーム呼ぶ（間引きの頻度を正しく減らすため）。
+   */
+  shatter(shattered: number, ft: FrameTime): void {
+    const n = this.shatterThrottle.update(ft.real, ft.realDt, shattered);
+    if (n > 0) this.sfx.solidShatter(n, this.shatterThrottle.gain);
   }
 }

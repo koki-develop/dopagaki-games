@@ -88,6 +88,21 @@ export class BreakoutSfx {
   }
 
   /**
+   * 壊れないブロックがフィナーレで砕ける: 高い金属の破片が散る音と、詰まった低い割れ音。
+   * count はこの 1 音にまとめた数で、音量を log スケールで増やす。gain は間引きによる 1 音の音量
+   */
+  solidShatter(count: number, gain: number): void {
+    const v = this.open(0.2, Math.min(1.2, 0.45 + 0.15 * Math.log2(1 + count)) * gain);
+    if (!v) return;
+    const t = v.start;
+    noise(v, t, 'highpass', 3000, DEFAULT_Q, 0.001, 0.12, 0.35, Math.random());
+    noise(v, t, 'bandpass', rand(800, 1000), 1, 0.001, 0.06, 0.3, Math.random());
+    const f = 1800 * 2 ** (jitterCents(60) / 1200);
+    tone(v, t, 'sine', f, 0.001, 0.18, 0.08);
+    tone(v, t, 'sine', f * 1.47, 0.001, 0.12, 0.06);
+  }
+
+  /**
    * ブロックを壊す: ペンタトニックで上がる Shepard tone とクリック。
    * count はこの 1 音にまとめた破壊数で、音量と厚みを log スケールで増やす。gain は間引きによる 1 音の音量。
    * brightness（演出の強さ）が上がるほど音を短く明るくし、低音の塊を減らして、速く続けて鳴っても濁らないようにする。

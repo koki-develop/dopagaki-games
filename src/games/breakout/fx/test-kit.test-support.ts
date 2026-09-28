@@ -26,6 +26,7 @@ const SFX_METHODS = [
   'paddle',
   'hardHit',
   'solidHit',
+  'solidShatter',
   'breakNote',
   'megaBurst',
   'ballsZero',
@@ -124,13 +125,17 @@ export class CountingSink<T extends object> {
   };
 }
 
+/** 壊れないブロックを散らした 2 行。clearingSim / losingSim の上に積む */
+export const SOLID_ROWS: readonly string[] = ['X.X.X.X.X.X.', '.X.X.X.X.X.X'];
+
 /**
- * 1 個のブロックだけのステージ。最初のボールが数ステップで最後のブロックを壊してクリアする。
+ * 壊せるブロックが 1 個だけのステージ。最初のボールが数ステップで最後のブロックを壊してクリアする。
  * extraBalls 個のボールを、ブロックから離れた下の方に置いておく（クリアの時点で残っているボール）。
+ * aboveRows はステージの上に積む行（壊れないブロックを置くのに使う）。
  */
-export function clearingSim(extraBalls: number, patch?: (t: Tuning) => void): Sim {
+export function clearingSim(extraBalls: number, patch?: (t: Tuning) => void, aboveRows: readonly string[] = []): Sim {
   const sim = new Sim({
-    mode: stageMode(emptyRows(10).concat([line(2, 'o')])),
+    mode: stageMode([...aboveRows, ...emptyRows(10), line(2, 'o')]),
     seed: 1,
     config: simConfig((t) => {
       t.blocks.ballsFromBall = 0;
@@ -142,10 +147,10 @@ export function clearingSim(extraBalls: number, patch?: (t: Tuning) => void): Si
   return sim;
 }
 
-/** 残機 1 で、ボールが無い（次のステップでゲームオーバーになる）ステージ */
-export function losingSim(): Sim {
+/** 残機 1 で、ボールが無い（次のステップでゲームオーバーになる）ステージ。aboveRows はステージの上に積む行 */
+export function losingSim(aboveRows: readonly string[] = []): Sim {
   return new Sim({
-    mode: stageMode(emptyRows(10).concat([line(2, 'o'), line(6, 'o')])),
+    mode: stageMode([...aboveRows, ...emptyRows(10), line(2, 'o'), line(6, 'o')]),
     seed: 1,
     config: simConfig((t) => {
       t.stage.lives = 1;

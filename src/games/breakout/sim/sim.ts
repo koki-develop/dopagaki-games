@@ -65,8 +65,8 @@ export function paddleRange(config: SimConfig): { min: number; max: number } {
  * ブロック崩しのゲームロジック本体。描画にも時刻にも依存せず、固定ステップ（STEP_DT）の `step()` だけで進む。
  * 同じシード・同じ調整値・同じ入力列なら、必ず同じ結果になる。
  *
- * 状態は読み取り専用で公開する。外から変えられるのは、入力（`step`）と、プレイが決着した後のボールの回収と
- * ボールボーナスの加算（`collectBalls` / `creditClearBonus`）だけ。
+ * 状態は読み取り専用で公開する。外から変えられるのは、入力（`step`）と、プレイが決着した後のボールの回収、
+ * 壊れないブロックの破砕、ボールボーナスの加算（`collectBalls` / `shatterSolids` / `creditClearBonus`）だけ。
  */
 export class Sim {
   readonly mode: SimMode;
@@ -246,6 +246,30 @@ export class Sim {
       removed++;
     }
     if (removed > 0) b.compact();
+    return removed;
+  }
+
+  /**
+   * 決着した後（ステージクリアのフィナーレ）に、中心が条件に合う壊れないブロックを取り除く。
+   * 取り除いたブロックの中心で onShattered を呼び、取り除いた数を返す。得点は変えない。プレイ中は何もしない。
+   */
+  shatterSolids(pred: (x: number, y: number) => boolean, onShattered: (x: number, y: number) => void): number {
+    if (this._phase === 'playing') return 0;
+    const f = this.field;
+    let removed = 0;
+    for (let row = 0; row < f.rowCount; row++) {
+      const base = f.slotOf(row) * COLS;
+      const cy = f.centerY(row);
+      for (let col = 0; col < COLS; col++) {
+        const idx = base + col;
+        if (f.type[idx] !== BlockType.Solid) continue;
+        const cx = cellCenterX(col);
+        if (!pred(cx, cy)) continue;
+        f.removeAt(idx);
+        onShattered(cx, cy);
+        removed++;
+      }
+    }
     return removed;
   }
 

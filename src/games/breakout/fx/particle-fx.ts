@@ -93,6 +93,19 @@ export class ParticleFx {
     this.sparks(now, x, y, SOLID_RGB[0] * k, SOLID_RGB[1] * k, SOLID_RGB[2] * k, 2, 3, budget, Math.atan2(dirY, dirX));
   }
 
+  /**
+   * 壊れないブロックがフィナーレの衝撃波で砕ける: 光の点と、aim（衝撃波の中心から外への向き）へ散る火花、必要なら破片。
+   * 色は鋼の色
+   */
+  solidShatter(now: number, x: number, y: number, aim: number, budget: number, withDebris: boolean): void {
+    const r = SOLID_RGB[0];
+    const g = SOLID_RGB[1];
+    const b = SOLID_RGB[2];
+    this.emit(now, x, y, 0, 0, 0.16, 0.35, 0.8, r * 1.4, g * 1.4, b * 1.4, ParticleShape.Dot, 0, 0);
+    this.sparks(now, x, y, r * 1.6, g * 1.6, b * 1.6, 5, 6, budget, aim);
+    if (withDebris) this.debris(now, x, y, 3, r, g, b);
+  }
+
   /** パドルで打った火花。上向きに散らし、色は背景の色相の反対側 */
   paddleSparks(now: number, x: number, y: number, hue: number, budget: number): void {
     const c = neonRgb(hue / TAU + 0.5, this.c);

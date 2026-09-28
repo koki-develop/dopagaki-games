@@ -81,6 +81,24 @@ describe('ParticleFx', () => {
     }
   });
 
+  test('壊れないブロックが砕ける: 光の点 1 つ + 衝撃波の外向きの火花 5 個 + 鋼の色の破片 3 個', () => {
+    const { particles, debris, fx } = make();
+    fx.solidShatter(0, 3, 5, 0, 1, true);
+    expect(particles.count).toBe(6);
+    expect(debris.count).toBe(3);
+    const dot = particles.kept[0];
+    expect(dot.shape).toBe(ParticleShape.Dot);
+    expect([dot.r, dot.g, dot.b]).toEqual([SOLID_RGB[0] * 1.4, SOLID_RGB[1] * 1.4, SOLID_RGB[2] * 1.4]);
+    for (const p of particles.kept.slice(1)) {
+      expect(p.shape).toBe(ParticleShape.Spark);
+      expect(Math.abs(Math.atan2(p.vy, p.vx))).toBeLessThanOrEqual(1.1 + 1e-9);
+    }
+    expect([debris.kept[0].r, debris.kept[0].g, debris.kept[0].b]).toEqual([...SOLID_RGB]);
+    const noDebris = make();
+    noDebris.fx.solidShatter(0, 3, 5, 0, 1, false);
+    expect(noDebris.debris.count).toBe(0);
+  });
+
   test('スコアへの光の筋は、スコアの位置を目標にし、寿命がそのまま届くまでの時間', () => {
     const { particles, fx } = make();
     fx.setAnchor(2, 17);

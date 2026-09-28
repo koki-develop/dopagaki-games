@@ -174,6 +174,25 @@ describe('SoundDirector', () => {
     expect(t.rec.calls.length).toBe(n);
   });
 
+  test('フィナーレで砕ける音は、砕けたフレームでだけ鳴らし、0.05 秒より詰めずにまとめる', () => {
+    const t = setup();
+    t.sounds.quiesce();
+    for (let i = 0; i < 60; i++) {
+      t.ft.real += 1 / 60;
+      t.sounds.shatter(2, t.ft);
+    }
+    const calls = t.rec.of('sfx.solidShatter');
+    expect(calls.length).toBeLessThanOrEqual(Math.ceil(1 / 0.05) + 1);
+    expect(calls.length).toBeGreaterThan(10);
+    expect(calls[0].args[0]).toBe(2);
+    expect(calls[1].args[0]).toBeGreaterThan(2);
+    for (let i = 0; i < 30; i++) {
+      t.ft.real += 1 / 60;
+      t.sounds.shatter(0, t.ft);
+    }
+    expect(t.rec.of('sfx.solidShatter').length).toBe(calls.length);
+  });
+
   test('フィナーレの届く音は間引いてまとめ、音程は届いた数の合計で進む', () => {
     const t = setup();
     let collected = 0;

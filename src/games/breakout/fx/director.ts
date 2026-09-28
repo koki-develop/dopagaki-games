@@ -47,7 +47,7 @@ export type DirectorPorts = {
 };
 
 type DirectorOptions = {
-  /** 読むだけに使う。書き換えるのは決着した後のボールの回収とボールボーナスの加算だけ */
+  /** 読むだけに使う。書き換えるのは決着した後のボールの回収、壊れないブロックの破砕、ボールボーナスの加算だけ */
   sim: Sim;
   clock: WorldClock;
   camera: CameraRig;

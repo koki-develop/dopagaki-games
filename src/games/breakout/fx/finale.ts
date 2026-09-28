@@ -32,6 +32,9 @@ const HOLD_REAL_GRACE = 0.1;
 const VIGNETTE_RELEASE = 0.35;
 /** 1 フレームで光の筋を出すボールの数の上限（品質の倍率を掛ける前）。超えた分も得点には数える */
 const MAX_STREAK_FX = 160;
+/** 1 フレームで砕ける演出を出す壊れないブロックの数と、そのうち破片も出す数の上限（品質の倍率を掛ける前） */
+const MAX_SHATTER_FX = 24;
+const MAX_SHATTER_DEBRIS_FX = 12;
 /** 溜めの無音から戻すフェード（秒） */
 const SILENCE_FADE_IN = 0.005;
 
@@ -67,7 +70,7 @@ type FinaleStage = 'idle' | 'hold' | 'collect' | 'settle' | 'landed' | 'skipped'
 
 /**
  * ステージクリアのフィナーレ。溜め → 炸裂 → 回収 → 余韻 → 着地（またはスキップ）の順に一方向へだけ進む。
- * 衝撃波の広がりとボールの回収は、シェーダーの衝撃波の輪と同じ世界時間の式で決める。
+ * 衝撃波の広がり、ボールの回収、壊れないブロックの破砕は、シェーダーの衝撃波の輪と同じ世界時間の式で決める。
  */
 export class Finale {
   private readonly d: FinaleDeps;
@@ -101,6 +104,12 @@ export class Finale {
   private framePresent = 0;
   private streakFx = 0;
   private streakLimit = 0;
+  private frameBudget = 1;
+  /** このフレームに砕けた壊れないブロックの数と、演出を出した数 */
+  private shattered = 0;
+  private shatterFx = 0;
+  private shatterLimit = 0;
+  private shatterDebrisLimit = 0;
   private readonly inShock = (x: number, y: number): boolean => {
     if (this.sweepAll) return true;
     const dx = x - this.x;
@@ -112,6 +121,13 @@ export class Finale {
     if (this.arrivalCount < this.arrivals.length) this.arrivals[this.arrivalCount++] = this.frameWorld + flight;
     if (this.streakFx++ >= this.streakLimit) return;
     this.d.particles.finaleStreak(this.framePresent, x, y, this.x, this.y, flight);
+  };
+  private readonly onShattered = (x: number, y: number): void => {
+    this.shattered++;
+    if (this.shatterFx >= this.shatterLimit) return;
+    const aim = Math.atan2(y - this.y, x - this.x);
+    this.d.particles.solidShatter(this.framePresent, x, y, aim, this.frameBudget, this.shatterFx < this.shatterDebrisLimit);
+    this.shatterFx++;
   };
   private readonly all = (): boolean => true;
   private readonly ignore = (): void => undefined;
@@ -158,12 +174,16 @@ export class Finale {
     return false;
   }
 
-  /** タップで飛ばす。残りのボールとまだ届いていない光をまとめて得点にする。飛ばせたら true */
+  /**
+   * タップで飛ばす。残りのボールとまだ届いていない光をまとめて得点にし、残りの壊れないブロックも音と粒を出さずに取り除く。
+   * 飛ばせたら true
+   */
   skip(): boolean {
     const s = this.stage;
     if (s !== 'hold' && s !== 'collect' && s !== 'settle') return false;
     const sim = this.d.sim;
     sim.collectBalls(this.all, this.ignore);
+    sim.shatterSolids(this.all, this.ignore);
     sim.creditClearBonus(Infinity);
     this.arrivalCount = 0;
     this.cancelSilence();
@@ -240,7 +260,10 @@ export class Finale {
     d.vibrate(80);
   }
 
-  /** 衝撃波が通過したボールから順に光の筋へ変え、届いた光の数だけ得点にする */
+  /**
+   * 衝撃波が通過したボールから順に光の筋へ変え、届いた光の数だけ得点にする。
+   * 衝撃波が中心を通過した壊れないブロックは砕く
+   */
   private collect(ft: FrameTime, budget: number): void {
     const d = this.d;
     const since = ft.world - this.burstWorld;
@@ -249,9 +272,17 @@ export class Finale {
     this.sweepAll = since >= SHOCK_TRAVEL;
     this.frameWorld = ft.world;
     this.framePresent = ft.present;
+    this.frameBudget = budget;
     this.streakFx = 0;
     this.streakLimit = Math.ceil(MAX_STREAK_FX * budget);
     d.sim.collectBalls(this.inShock, this.onCollected);
+
+    this.shattered = 0;
+    this.shatterFx = 0;
+    this.shatterLimit = Math.ceil(MAX_SHATTER_FX * budget);
+    this.shatterDebrisLimit = Math.ceil(MAX_SHATTER_DEBRIS_FX * budget);
+    d.sim.shatterSolids(this.inShock, this.onShattered);
+    d.sounds.shatter(this.shattered, ft);
 
     let arrived = 0;
     const a = this.arrivals;

@@ -1,10 +1,13 @@
 import { describe, expect, test } from 'bun:test';
-import { tuning } from '../config.ts';
+import { BlockType, COLS, tuning } from '../config.ts';
+import { cellCenterX } from '../sim/blocks.ts';
+import type { Sim } from '../sim/sim.ts';
 import { dropAllBalls } from '../sim/sim.test-support.ts';
-import { FINALE_SETTLE, SHOCK_TRAVEL } from './finale.ts';
+import { SOLID_RGB } from '../view/palette.ts';
+import { FINALE_SETTLE, SHOCK_SPEED, SHOCK_TRAVEL } from './finale.ts';
 import { GAME_OVER_FINISH } from './game-over.ts';
 import { NewBest } from './peak.ts';
-import { clearingSim, Harness, losingSim } from './test-kit.test-support.ts';
+import { clearingSim, Harness, losingSim, SOLID_ROWS } from './test-kit.test-support.ts';
 
 /** フィナーレで鳴る音（音の順番で段階の進み方を見る） */
 const FINALE_SOUNDS = ['sfx.inhale', 'sfx.finaleBurst', 'sfx.bonusNote', 'sfx.resolveChord'];
@@ -14,6 +17,18 @@ function toBurst(h: Harness): number {
   h.until(() => h.ended, 600);
   h.until(() => h.rec.count('sfx.finaleBurst') > 0, 60);
   return h.ft.world;
+}
+
+/** 残っている壊れないブロックの中心 */
+function solidCenters(sim: Sim): [number, number][] {
+  const f = sim.blocks;
+  const out: [number, number][] = [];
+  for (let row = 0; row < f.rowCount; row++) {
+    for (let col = 0; col < COLS; col++) {
+      if (f.type[f.slotOf(row) * COLS + col] === BlockType.Solid) out.push([cellCenterX(col), f.centerY(row)]);
+    }
+  }
+  return out;
 }
 
 /**
@@ -145,5 +160,76 @@ describe('NewBest', () => {
     expect(b.isNewBest(1)).toBe(true);
     expect(b.check(100000, true)).toBe(false);
     expect(b.check(100000, true)).toBe(false);
+  });
+});
+
+describe('壊れないブロックの破砕', () => {
+  test('衝撃波が中心を通過したものから順に砕け、渡りきったときには残らない。得点は変わらない', () => {
+    const h = new Harness({ sim: clearingSim(10, undefined, SOLID_ROWS) });
+    h.particles.keep = true;
+    const total = solidCenters(h.sim).length;
+    expect(total).toBe(12);
+    h.until(() => h.ended, 600);
+    // 溜めの間は砕けない
+    expect(solidCenters(h.sim).length).toBe(total);
+    const burstWorld = toBurst(h);
+    const cx = h.fx.shockX;
+    const cy = h.fx.shockY;
+    const target = h.sim.score + h.sim.clearBonusRemaining * tuning.score.pointsClearBall;
+    let partial = 0;
+    let soundFrames = 0;
+    for (let i = 0; i < 120 && h.ft.world - burstWorld < SHOCK_TRAVEL; i++) {
+      const before = solidCenters(h.sim).length;
+      const sounds = h.rec.count('sfx.solidShatter');
+      h.frame();
+      const left = solidCenters(h.sim);
+      const r = (h.ft.world - burstWorld) * SHOCK_SPEED;
+      for (const [x, y] of left) expect(Math.hypot(x - cx, y - cy)).toBeGreaterThan(r);
+      if (left.length > 0 && left.length < total) partial++;
+      // 音は砕けたフレームでだけ鳴る
+      if (h.rec.count('sfx.solidShatter') > sounds) {
+        soundFrames++;
+        expect(left.length).toBeLessThan(before);
+      }
+    }
+    expect(partial).toBeGreaterThan(2);
+    expect(soundFrames).toBeGreaterThan(0);
+    h.frame();
+    expect(solidCenters(h.sim).length).toBe(0);
+    expect(h.sim.blocks.liveCount).toBe(0);
+    // 砕けた光は鋼の色
+    expect(h.particles.kept.some((p) => p.r === SOLID_RGB[0] * 1.4 && p.b === SOLID_RGB[2] * 1.4)).toBe(true);
+    h.until(() => h.finishes > 0, 800);
+    expect(h.sim.score).toBe(target);
+  });
+
+  test('飛ばすと、残りは音も粒も出さずに取り除く。最終スコアは見届けたときと同じ', () => {
+    const watched = new Harness({ sim: clearingSim(20, undefined, SOLID_ROWS) });
+    watched.until(() => watched.finishes > 0, 800);
+    for (const framesBeforeSkip of [0, 20, 30]) {
+      const h = new Harness({ sim: clearingSim(20, undefined, SOLID_ROWS) });
+      h.until(() => h.ended, 600);
+      h.run(framesBeforeSkip);
+      const sounds = h.rec.count('sfx.solidShatter');
+      const particles = h.particles.count;
+      expect(h.director.skip()).toBe(true);
+      expect(solidCenters(h.sim).length).toBe(0);
+      expect(h.particles.count).toBe(particles);
+      h.run(300);
+      expect(h.rec.count('sfx.solidShatter')).toBe(sounds);
+      expect(h.sim.score).toBe(watched.sim.score);
+    }
+  });
+
+  test('ゲームオーバーでは砕けない', () => {
+    const sim = losingSim(SOLID_ROWS);
+    const h = new Harness({ sim });
+    h.frame();
+    dropAllBalls(sim);
+    h.until(() => h.finishes > 0, 400);
+    h.run(300);
+    expect(h.sim.phase).toBe('over');
+    expect(solidCenters(h.sim).length).toBe(12);
+    expect(h.rec.count('sfx.solidShatter')).toBe(0);
   });
 });

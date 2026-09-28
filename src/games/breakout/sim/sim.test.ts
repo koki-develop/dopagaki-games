@@ -670,6 +670,40 @@ describe('ステージ', () => {
     expect(sim.blocks.hitAt[idx]).toBeGreaterThan(before);
   });
 
+  test('壊れないブロックの破砕は、決着した後に中心が条件に合うものだけを取り除き、得点は変えない', () => {
+    const sim = makeSim(stageMode(emptyRows(10).concat(['X....X....XX', line(2, 'o')])), 1, (t) => {
+      t.blocks.ballsFromBall = 0;
+    });
+    const all = () => true;
+    const never = () => {
+      throw new Error('should not be called');
+    };
+    expect(sim.shatterSolids(all, never)).toBe(0);
+    expect(sim.blocks.liveCount).toBe(5);
+    placeBall(sim, cellCenterX(2), sim.blocks.centerY(0) - 1, 0, 1);
+    runSteps(sim, 60);
+    expect(sim.phase).toBe('cleared');
+    const score = sim.score;
+    const bonus = sim.clearBonusRemaining;
+    const shattered: number[][] = [];
+    const n = sim.shatterSolids(
+      (x) => x > cellCenterX(4),
+      (x, y) => shattered.push([x, y]),
+    );
+    const cy = sim.blocks.centerY(1);
+    expect(n).toBe(3);
+    expect(shattered).toEqual([
+      [cellCenterX(5), cy],
+      [cellCenterX(10), cy],
+      [cellCenterX(11), cy],
+    ]);
+    expect(sim.blocks.type[sim.blocks.slotOf(1) * COLS]).toBe(BlockType.Solid);
+    expect([sim.blocks.liveCount, sim.blocks.breakableCount]).toEqual([1, 0]);
+    expect(sim.shatterSolids(all, () => undefined)).toBe(1);
+    expect(sim.blocks.liveCount).toBe(0);
+    expect([sim.score, sim.clearBonusRemaining]).toEqual([score, bonus]);
+  });
+
   test('クリアの位置は、クリアより前のフレームで壊したブロックでは上書きされない', () => {
     const sim = makeSim(stageMode(emptyRows(10).concat([line(2, 'o'), line(9, 'o')])), 1, (t) => {
       t.blocks.ballsFromBall = 0;
