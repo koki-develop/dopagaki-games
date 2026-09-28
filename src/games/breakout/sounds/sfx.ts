@@ -25,6 +25,8 @@ const PEAK_VOICING = [45, 52, 57, 60, 64, 67, 71, 74, 76, 79] as const;
 const FINALE_CHORD = [33, 45, 52, 57, 60, 64, 69, 71, 76, 81, 84] as const;
 /** フィナーレの最後に解決する和音（C メジャー 9） */
 const RESOLVE_CHORD = [36, 48, 55, 59, 62, 64, 67, 72, 76] as const;
+/** エンドレスの全消しの和音。解決の和音と同じ C メジャー 9 を、高い音域だけで組む */
+const ALL_CLEAR_CHORD = [60, 64, 67, 71, 74, 79] as const;
 /** supersaw の 1 音を 2 本のノコギリ波に分けるデチューン（セント） */
 const SUPERSAW_DETUNE = 9;
 
@@ -35,7 +37,7 @@ const rand = (a: number, b: number) => a + Math.random() * (b - a);
  * 同じ音でも毎回ピッチと音色をわずかに揺らす。
  *
  * 1 回のプレイごとに作り、鳴らす音はすべて group に属する。プレイを捨てるときは group.stopAll() で残響ごと止める。
- * 聞き逃せない節目の音（ボール 0・着地・ゲームオーバー・Peak・フィナーレ）は event の優先度で鳴らし、
+ * 聞き逃せない節目の音（ボール 0・着地・全消し・ゲームオーバー・Peak・フィナーレ）は event の優先度で鳴らし、
  * 大量に鳴る普段の音に同時発音数の枠を奪われないようにする。
  */
 export class BreakoutSfx {
@@ -144,7 +146,7 @@ export class BreakoutSfx {
     glide(noise(v, t, 'lowpass', 420, DEFAULT_Q, 0.01, 0.9, 0.5, Math.random()).frequency, 60, t + 0.91);
   }
 
-  /** ペナルティで降りてきたブロックが着地した: 叩きつける音 */
+  /** 大きな落下（ペナルティと全消しの補充）が着地した: 叩きつける音 */
   slam(): void {
     const v = this.open(0.6, 1, 'event');
     if (!v) return;
@@ -162,6 +164,19 @@ export class BreakoutSfx {
     glide(noise(v, t, 'lowpass', 1100, DEFAULT_Q, 0.001, 0.14, 0.6, Math.random()).frequency, 160, t + 0.141);
     glide(tone(v, t, 'sine', 95, 0.002, 0.18, 0.7).frequency, 48, t + 0.12);
     noise(v, t, 'highpass', 3200, DEFAULT_Q, 0.001, 0.012, 0.25, Math.random());
+  }
+
+  /**
+   * エンドレスの全消し: 立ち上がりの速い明るい和音と、上へ抜ける風切り音、軽い低音。
+   * 序盤は続けて起きるので、Peak やフィナーレより短く、低音を軽くする
+   */
+  allClear(): void {
+    const v = this.open(1.2, 0.7, 'event');
+    if (!v) return;
+    const t = v.start;
+    this.supersaw(v, t, ALL_CLEAR_CHORD, ALL_CLEAR_CHORD.length, 1.0, 0.004, 5000);
+    glide(noise(v, t, 'bandpass', 900, 0.7, 0.002, 0.5, 0.3, Math.random()).frequency, 8000, t + 0.502);
+    glide(tone(v, t, 'sine', 100, 0.002, 0.35, 0.5).frequency, 40, t + 0.3);
   }
 
   /** ゲームオーバー: 下がっていく暗い音 */

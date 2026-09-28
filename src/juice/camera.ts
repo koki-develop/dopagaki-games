@@ -15,11 +15,13 @@ export type CameraOffset = {
  * - shake: 衝撃による揺れ（trauma）
  * - pulse: ビートに合わせた拍動
  * - pull: 大きな節目で引いて戻るズーム
+ * - punch: 衝撃に伴って引いて戻るズーム。揺れの一部として扱う
  */
 export type CameraMotion = {
   shake: number;
   pulse: number;
   pull: number;
+  punch: number;
 };
 
 type CameraRigOptions = {
@@ -33,10 +35,12 @@ type CameraRigOptions = {
   frequency: number;
 };
 
-type Pull = { amount: number; start: number; attack: number; release: number };
+/** punch が true なら CameraMotion.punch、false なら CameraMotion.pull の倍率を掛ける */
+type Pull = { amount: number; start: number; attack: number; release: number; punch: boolean };
 
 /**
  * trauma ベースのカメラシェイクと、カメラの引き（ズームアウトして戻る）、ビートに合わせた拍動。1 回のプレイごとに作る。
+ * 引きは、大きな節目の引き（pull）と、衝撃に伴う引き（punch）の 2 種類で、ユーザー設定による倍率を別々に掛ける。
  * 揺れは trauma² に比例させ、Perlin ノイズから取り、世界時間で進める。
  * 世界が止まると揺れも止まり、スローモーションでは揺れもゆっくりになる。
  */
@@ -61,9 +65,14 @@ export class CameraRig {
     this.trauma = clamp01(this.trauma + amount);
   }
 
-  /** amount だけ引いて（zoom を下げて）から戻す。時間は世界時間の秒 */
+  /** 大きな節目で、amount だけ引いて（zoom を下げて）から戻す。時間は世界時間の秒 */
   pull(amount: number, attack: number, release: number): void {
-    this.pulls.push({ amount, start: this.time, attack, release });
+    this.pulls.push({ amount, start: this.time, attack, release, punch: false });
+  }
+
+  /** 衝撃に伴って、amount だけ引いてから戻す。揺れの一部として扱う。時間は世界時間の秒 */
+  punch(amount: number, attack: number, release: number): void {
+    this.pulls.push({ amount, start: this.time, attack, release, punch: true });
   }
 
   update(worldDt: number): void {
@@ -86,9 +95,9 @@ export class CameraRig {
     for (const p of this.pulls) {
       const e = this.time - p.start;
       const k = e < p.attack ? easeOutCubic(e / p.attack) : 1 - easeOutCubic((e - p.attack) / p.release);
-      pull += p.amount * k;
+      pull += p.amount * k * (p.punch ? motion.punch : motion.pull);
     }
-    out.zoom = 1 - Math.min(0.35, pull) * motion.pull + this.beatAmount * this.beatEnvelope * motion.pulse;
+    out.zoom = 1 - Math.min(0.35, pull) + this.beatAmount * this.beatEnvelope * motion.pulse;
     return out;
   }
 }

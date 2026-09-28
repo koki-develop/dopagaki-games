@@ -27,6 +27,7 @@ const NODES_PER_CALL: [string, (s: BreakoutSfx) => void, number][] = [
   ['ballsZero', (s) => s.ballsZero(), 8],
   ['slam', (s) => s.slam(), 9],
   ['stepThud', (s) => s.stepThud(), 9],
+  ['allClear', (s) => s.allClear(), 20],
   ['gameOver', (s) => s.gameOver(), 9],
   ['peakChord (level 0)', (s) => s.peakChord(0), 18],
   ['peakChord (level 3)', (s) => s.peakChord(3), 28],
@@ -85,6 +86,22 @@ describe('BreakoutSfx', () => {
     // 自分で予約した stop() 以外に止められていない
     for (const s of burst) expect(s.stopCalls).toBe(1);
     expect(burst.some((s) => s.stopAt > 2.8)).toBe(true);
+  });
+
+  test('全消しの和音は、続けて鳴る破壊音に奪われない', () => {
+    const { ctx, engine, sfx } = setup();
+    const before = ctx.sources.length;
+    sfx.allClear();
+    const chord = ctx.sources.slice(before);
+    for (let f = 0; f < 90; f++) {
+      ctx.currentTime = f / 60;
+      engine.tick();
+      // 同時発音数の上限を超えるほど鳴らす
+      for (let k = 0; k < 4; k++) sfx.breakNote((f + k) % 40, 3, 0.8, 1);
+    }
+    // 自分で予約した stop() 以外に止められていない
+    for (const s of chord) expect(s.stopCalls).toBe(1);
+    expect(chord.some((s) => s.stopAt > 1.0)).toBe(true);
   });
 
   test('鳴らした音はすべて group に属し、stopAll() で残響ごと止まる', () => {

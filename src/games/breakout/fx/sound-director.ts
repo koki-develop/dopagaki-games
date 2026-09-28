@@ -16,6 +16,7 @@ export type SfxPort = Pick<
   | 'ballsZero'
   | 'slam'
   | 'stepThud'
+  | 'allClear'
   | 'gameOver'
   | 'peakChord'
   | 'inhale'

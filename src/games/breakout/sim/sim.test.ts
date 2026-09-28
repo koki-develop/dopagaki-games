@@ -32,6 +32,7 @@ import {
   line,
   makeSim,
   placeBall,
+  setBlock,
   stageMode,
 } from './sim.test-support.ts';
 
@@ -1038,15 +1039,42 @@ describe('エンドレス', () => {
     expect(f.liveCount).toBe(COLS);
     placeBall(sim, 4.5, 3, 0.2, 1);
     sim.step(hold(sim));
+    expect(sim.events.signals & Signal.AllClear).toBeTruthy();
     const refilled = f.liveCount;
     expect(refilled).toBeGreaterThan(tuning.endless.refillRows * COLS * 0.6);
     expect(refilled).toBeLessThanOrEqual(tuning.endless.refillRows * COLS);
     expect(f.lowestRowY).toBeCloseTo(FIELD_H, 9);
     sim.events.clear();
-    runSteps(sim, Math.ceil(tuning.endless.refillDropSeconds / STEP_DT) + 2);
+    let signals = 0;
+    let landedAt = -1;
+    runSteps(sim, Math.ceil(tuning.endless.refillDropSeconds / STEP_DT) + 2, () => {
+      signals |= sim.events.signals;
+      if (landedAt < 0 && sim.events.signals & Signal.RefillLanded) landedAt = f.lowestRowY;
+    });
+    // 着地したステップで知らせる。落ちている途中の補充は、全消しとして数え直さない
+    expect(landedAt).toBeCloseTo(FIELD_H - tuning.endless.refillRows * CELL_H, 9);
+    expect(signals & Signal.AllClear).toBeFalsy();
+    expect(signals & Signal.PenaltyLanded).toBeFalsy();
     expect(f.lowestRowY).toBeCloseTo(FIELD_H - tuning.endless.refillRows * CELL_H, 9);
     expect(f.liveCountBelow(FIELD_H - BLOCK_INSET_Y)).toBe(refilled);
     expect(f.topRowBottomY()).toBeGreaterThanOrEqual(FIELD_H - 1e-9);
+  });
+
+  test('見えている最後のブロックを壊すと、その中心を位置として全消しを知らせる', () => {
+    const sim = makeSim(ENDLESS, 5);
+    clearVisibleRows(sim);
+    setBlock(sim, 0, 4, BlockType.Ball, 1);
+    const cy = sim.blocks.centerY(0);
+    placeBall(sim, cellCenterX(4), cy - 1.5, 0, 1);
+    const at: number[] = [];
+    let breaks = 0;
+    runSteps(sim, 120, () => {
+      const ev = sim.events;
+      breaks += ev.counts[EventKind.BlockBreak];
+      if (at.length === 0 && ev.signals & Signal.AllClear) at.push(ev.signalX, ev.signalY);
+    });
+    expect(breaks).toBeGreaterThanOrEqual(1);
+    expect(at).toEqual([cellCenterX(4), cy]);
   });
 
   test('全部消したのと同じステップでボールが 0 個になると、補充とペナルティを合わせて落とす', () => {
@@ -1064,6 +1092,7 @@ describe('エンドレス', () => {
       signals |= sim.events.signals;
     });
     expect(signals & Signal.PenaltyLanded).toBeTruthy();
+    expect(signals & Signal.RefillLanded).toBeTruthy();
     const rows = tuning.endless.refillRows + tuning.endless.penaltyRows;
     expect(sim.blocks.lowestRowY).toBeCloseTo(FIELD_H - rows * CELL_H, 9);
   });

@@ -3,7 +3,7 @@ import { safeLocalStorage } from './storage.ts';
 import type { StorageLike } from './storage.ts';
 
 export type Settings = {
-  /** 画面の揺れ。衝撃による揺れと、ビートに合わせた拍動の両方 */
+  /** 画面の揺れ。衝撃による揺れと、それに伴う引き、ビートに合わせた拍動 */
   shake: boolean;
   /** 効果音 */
   sfx: boolean;
@@ -23,7 +23,7 @@ const REDUCED_CAMERA_MOTION = 0.3;
 
 /**
  * ユーザー設定から、カメラの動きの種類ごとの倍率を決める。
- * 画面の揺れをオフにすると、衝撃による揺れとビートの拍動を止める。
+ * 画面の揺れをオフにすると、衝撃による揺れと、それに伴う引き、ビートの拍動を止める。大きな節目の引きは止めない。
  * `prefers-reduced-motion: reduce` では、拍動と引きを弱める。
  */
 export function cameraMotionFor(s: Settings, reducedMotion: boolean, out: CameraMotion): CameraMotion {
@@ -31,6 +31,7 @@ export function cameraMotionFor(s: Settings, reducedMotion: boolean, out: Camera
   out.shake = s.shake ? 1 : 0;
   out.pulse = s.shake ? motion : 0;
   out.pull = motion;
+  out.punch = s.shake ? motion : 0;
   return out;
 }
 
@@ -69,7 +70,7 @@ export class SettingsStore {
   private value: Settings;
   private reduced: boolean;
   /** 毎フレーム読まれるので、作り直さずに設定が変わったときだけ書き換える */
-  private readonly motion: CameraMotion = { shake: 1, pulse: 1, pull: 1 };
+  private readonly motion: CameraMotion = { shake: 1, pulse: 1, pull: 1, punch: 1 };
   private readonly listeners = new Set<Listener>();
   private readonly storage: StorageLike | null;
 

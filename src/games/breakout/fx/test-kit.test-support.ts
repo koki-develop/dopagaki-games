@@ -5,12 +5,22 @@
 import { CameraRig } from '../../../juice/camera.ts';
 import { FlashLimiter } from '../../../juice/flash.ts';
 import { WorldClock } from '../../../juice/time.ts';
-import { STEP_DT } from '../config.ts';
+import { BlockType, STEP_DT } from '../config.ts';
 import type { Tuning } from '../config.ts';
 import type { FrameTime } from '../frame-time.ts';
 import { cellCenterX } from '../sim/blocks.ts';
 import { Sim } from '../sim/sim.ts';
-import { emptyRows, line, placeBall, simConfig, stageMode } from '../sim/sim.test-support.ts';
+import {
+  clearVisibleRows,
+  emptyRows,
+  ENDLESS,
+  line,
+  makeSim,
+  placeBall,
+  setBlock,
+  simConfig,
+  stageMode,
+} from '../sim/sim.test-support.ts';
 import type { BgmPort } from './atmosphere.ts';
 import { Director } from './director.ts';
 import type { DirectorOutcome, DirectorPorts } from './director.ts';
@@ -32,6 +42,7 @@ const SFX_METHODS = [
   'ballsZero',
   'slam',
   'stepThud',
+  'allClear',
   'gameOver',
   'peakChord',
   'inhale',
@@ -144,6 +155,24 @@ export function clearingSim(extraBalls: number, patch?: (t: Tuning) => void, abo
   });
   placeBall(sim, cellCenterX(2), sim.blocks.centerY(0) - 3, 0, 1);
   for (let k = 0; k < extraBalls; k++) placeBall(sim, 5 + (k % 30) * 0.12, 2.2 + Math.floor(k / 30) * 0.3, 0.3, 1);
+  return sim;
+}
+
+/** 全消しになるブロック（一番下の行の列 4）の中心 */
+export function allClearTarget(sim: Sim): [number, number] {
+  return [cellCenterX(4), sim.blocks.centerY(0)];
+}
+
+/**
+ * 見えているブロックが一番下の行の 1 個だけのエンドレス。真下から上へ飛ぶボールが、数ステップでそれを壊して全消しにする。
+ * 天井の外の予備の行は残る
+ */
+export function allClearSim(): Sim {
+  const sim = makeSim(ENDLESS, 5);
+  clearVisibleRows(sim);
+  setBlock(sim, 0, 4, BlockType.Ball, 1);
+  const [x, y] = allClearTarget(sim);
+  placeBall(sim, x, y - 1.5, 0, 1);
   return sim;
 }
 

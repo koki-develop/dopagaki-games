@@ -124,6 +124,12 @@ export class ParticleFx {
     this.sparks(now, x, y, 1.2, 1.2, 1.3, 40, 9, budget, Number.NaN);
   }
 
+  /** エンドレスの全消し: フィナーレの炸裂より小さい輪と火花 */
+  allClearBurst(now: number, x: number, y: number, budget: number): void {
+    this.ring(now, x, y, 0.3, 6, 0.7, 1.0, 1.15, 1.35);
+    this.sparks(now, x, y, 1.0, 1.1, 1.25, 24, 7, budget, Number.NaN);
+  }
+
   /**
    * フィナーレで衝撃波が通過したボール: 光って、衝撃波の中心 (cx, cy) から外へ押し出されてから、flight 秒でスコアへ届く。
    */

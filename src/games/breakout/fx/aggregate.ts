@@ -63,7 +63,7 @@ export class FrameSummary {
   /** 壁に当たった数（あふれた分も含む） */
   wallCount = 0;
   signals = 0;
-  /** ステージクリアの位置。StageClear が立っているときだけ意味がある */
+  /** ステージクリアか全消しの位置（最後に壊したブロックの中心）。StageClear か AllClear が立っているときだけ意味がある */
   clearX = 0;
   clearY = 0;
   readonly index = new Int32Array(FX_LIST_CAPACITY);
@@ -96,7 +96,7 @@ export function summarize(ev: EventQueue, budget: number, out: FrameSummary): Fr
   out.paddleT = 0;
   out.wallCount = ev.counts[EventKind.WallHit];
   out.signals = ev.signals;
-  const cleared = (ev.signals & Signal.StageClear) !== 0;
+  const cleared = (ev.signals & (Signal.StageClear | Signal.AllClear)) !== 0;
   out.clearX = cleared ? ev.signalX : 0;
   out.clearY = cleared ? ev.signalY : 0;
 

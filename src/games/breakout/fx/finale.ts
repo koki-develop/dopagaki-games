@@ -7,8 +7,8 @@ import type { Sim } from '../sim/sim.ts';
 import { LOOK } from '../view/look.ts';
 import type { Atmosphere } from './atmosphere.ts';
 import type { FxState } from './fx-state.ts';
-import { PRESENT_LONG_AGO, SHOCK_SPEED_IDLE } from './fx-state.ts';
 import type { ParticleFx } from './particle-fx.ts';
+import type { Shockwave } from './shockwave.ts';
 import type { SfxPort, SoundDirector } from './sound-director.ts';
 
 /** 溜めの長さ（秒）。音が鳴っていれば AudioContext の時刻、鳴っていなければ実時間で測る */
@@ -52,6 +52,7 @@ type FinaleDeps = {
   sfx: SfxPort;
   sounds: SoundDirector;
   particles: ParticleFx;
+  shockwave: Shockwave;
   flashes: FlashLimiter;
   atmosphere: Atmosphere;
   vibrate(pattern: number | readonly number[]): void;
@@ -83,10 +84,9 @@ export class Finale {
   private holdStartAudio = 0;
   private holdStartReal = 0;
   private burst = false;
-  /** 炸裂した時刻（実時間・世界時間・present） */
+  /** 炸裂した時刻（実時間・世界時間） */
   private burstReal = 0;
   private burstWorld = 0;
-  private shockStart = PRESENT_LONG_AGO;
   /** 最後に書いた吸い込みと絞り込み、書いた時刻（実時間）。溜めの途中で飛ばしたとき、ここから戻す */
   private lastInhale = 0;
   private lastVignette = 0;
@@ -199,7 +199,7 @@ export class Finale {
     h?.cancel();
   }
 
-  /** 吸い込み・絞り込み・吸い込む点・衝撃波を fx へ書く */
+  /** 吸い込み・絞り込み・吸い込む点を fx へ書く */
   write(ft: FrameTime, fx: FxState): void {
     let inhale = 0;
     let vignette = 0;
@@ -227,10 +227,6 @@ export class Finale {
     fx.vignette = vignette;
     fx.focusX = this.stage === 'idle' ? 0 : this.x;
     fx.focusY = this.stage === 'idle' ? 0 : this.y;
-    fx.shockX = this.burst ? this.x : 0;
-    fx.shockY = this.burst ? this.y : 0;
-    fx.shockStart = this.shockStart;
-    fx.shockSpeed = this.burst ? SHOCK_SPEED : SHOCK_SPEED_IDLE;
   }
 
   /**
@@ -250,7 +246,7 @@ export class Finale {
     this.burst = true;
     this.burstReal = ft.real - over;
     this.burstWorld = ft.world;
-    this.shockStart = ft.present;
+    d.shockwave.fire(ft.present, this.x, this.y, SHOCK_SPEED);
     if (d.flashes.request(ft.real)) d.atmosphere.flashTo(LOOK.finaleFlash);
     if (d.flashes.request(ft.real)) d.atmosphere.boostTo(1.4);
     d.sfx.finaleBurst();

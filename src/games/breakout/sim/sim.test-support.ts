@@ -3,7 +3,7 @@
  * ボールを決まった位置と向きに置くには sim の内部へ触るしかないので、その操作はこのファイルだけに置く。
  */
 import { COLS, FIELD_H, sanitizeTuning, tuning } from '../config.ts';
-import type { SimConfig, Tuning } from '../config.ts';
+import type { BlockType, SimConfig, Tuning } from '../config.ts';
 import type { BallStore } from './balls.ts';
 import type { BlockField } from './blocks.ts';
 import { Sim } from './sim.ts';
@@ -87,6 +87,11 @@ export function clearBalls(sim: Sim): void {
 export function dropAllBalls(sim: Sim): void {
   inner(sim)._attached = false;
   inner(sim).ballStore.clear();
+}
+
+/** 行 row（一番下が 0）・列 col のセルを、種類 type・HP hp のブロックに置き直す */
+export function setBlock(sim: Sim, row: number, col: number, type: BlockType, hp: number): void {
+  inner(sim).field.setCell(row, col, type, hp, sim.time);
 }
 
 /** 見えている行（天井の外の予備の行を除く）のブロックをすべて消す */

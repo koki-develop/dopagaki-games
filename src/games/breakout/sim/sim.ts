@@ -98,7 +98,7 @@ export class Sim {
   /** パドルの速度（u/s）。発射角の傾きに使う */
   private paddleVel = 0;
 
-  /** 最後に壊したブロックの中心。ステージクリアの位置として知らせる */
+  /** 最後に壊したブロックの中心。ステージクリアと全消しの位置として知らせる */
   private lastBreakX = FIELD_W / 2;
   private lastBreakY = FIELD_H / 2;
 
@@ -339,6 +339,7 @@ export class Sim {
     this.field.pruneEmptyBottomRows();
     if (r.penaltyLanded) this.events.signal(Signal.PenaltyLanded);
     if (r.stepLanded) this.events.signal(Signal.StepLanded);
+    if (r.refillLanded) this.events.signal(Signal.RefillLanded);
   }
 
   /**
@@ -496,6 +497,7 @@ export class Sim {
       }
     } else if (!this.descent.refilling && f.liveCountBelow(FIELD_H - BLOCK_INSET_Y) === 0) {
       // 矩形がまだ天井の上にある行（予備の行）は数えない。補充する行は天井の外に置き、落下させて入れる
+      ev.signalAt(Signal.AllClear, this.lastBreakX, this.lastBreakY);
       this.fillEndlessRows(e.refillRows, FIELD_H);
       this.descent.startRefill(e.refillRows * CELL_H, e.refillDropSeconds);
     }

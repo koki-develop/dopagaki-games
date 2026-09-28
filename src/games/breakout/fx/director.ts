@@ -7,6 +7,8 @@ import { EventKind, Signal } from '../sim/events.ts';
 import type { Sim } from '../sim/sim.ts';
 import type { HudState } from '../types.ts';
 import { FrameSummary, FxFlag, summarize } from './aggregate.ts';
+import { playAllClear } from './all-clear.ts';
+import type { AllClearDeps } from './all-clear.ts';
 import { Atmosphere } from './atmosphere.ts';
 import type { BgmPort } from './atmosphere.ts';
 import { Finale } from './finale.ts';
@@ -19,6 +21,7 @@ import { NEW_BEST_PEAK_LEVEL, NewBest, playPeak } from './peak.ts';
 import type { PeakDeps } from './peak.ts';
 import { ParticleFx } from './particle-fx.ts';
 import type { DebrisSink, ParticleSink } from './particle-fx.ts';
+import { Shockwave } from './shockwave.ts';
 import { SoundDirector } from './sound-director.ts';
 import type { SfxPort } from './sound-director.ts';
 import { TierTracker } from './tiers.ts';
@@ -76,7 +79,7 @@ type DirectorLifecycle = 'live' | 'ending' | 'afterglow';
 type DirectorHud = Omit<HudState, 'runId' | 'maxLives'>;
 
 /**
- * sim のイベントを演出（音・パーティクル・破片・カメラ・背景・Peak・フィナーレ）へ変換する。1 回のプレイごとに作る。
+ * sim のイベントを演出（音・パーティクル・破片・カメラ・背景・Peak・全消し・フィナーレ）へ変換する。1 回のプレイごとに作る。
  * 大量に起きるイベントはフレーム単位で集計してから演出にする。
  * 時刻は FrameTime の軸を使い分ける: 粒と FxState の時刻は present、衝撃波と光の到着は world、
  * 滑らかな変化とフラッシュリミッターは real、音の予約は AudioContext の時刻。
@@ -97,6 +100,8 @@ export class Director {
   private readonly atmosphere: Atmosphere;
   private readonly newBest: NewBest;
   private readonly peakDeps: PeakDeps;
+  private readonly shockwave = new Shockwave();
+  private readonly allClearDeps: AllClearDeps;
   private readonly finale: Finale;
   private readonly gameOver: GameOver;
 
@@ -124,6 +129,14 @@ export class Director {
     this.newBest = new NewBest(opts.previousBest);
     const vibrate = (pattern: number | readonly number[]): void => ports.vibrate(pattern);
     this.peakDeps = { camera: opts.camera, sfx: ports.sfx, flashes: ports.flashes, atmosphere: this.atmosphere, vibrate };
+    this.allClearDeps = {
+      camera: opts.camera,
+      sfx: ports.sfx,
+      particles: this.particles,
+      shockwave: this.shockwave,
+      flashes: ports.flashes,
+      atmosphere: this.atmosphere,
+    };
     this.finale = new Finale({
       sim,
       clock: opts.clock,
@@ -132,6 +145,7 @@ export class Director {
       sfx: ports.sfx,
       sounds: this.sounds,
       particles: this.particles,
+      shockwave: this.shockwave,
       flashes: ports.flashes,
       atmosphere: this.atmosphere,
       vibrate,
@@ -241,9 +255,11 @@ export class Director {
       ports.sfx.stepThud();
       camera.addTrauma(0.07);
     }
-    if (signals & Signal.PenaltyLanded) {
+    if (signals & Signal.AllClear) playAllClear(ft, s.clearX, s.clearY, budget, this.allClearDeps);
+    // 補充の途中でペナルティが重なると両方が同時に立つ。着地は 1 回なので、音と粒も 1 回にする
+    if (signals & (Signal.PenaltyLanded | Signal.RefillLanded)) {
       ports.sfx.slam();
-      camera.addTrauma(0.25);
+      camera.addTrauma(signals & Signal.PenaltyLanded ? 0.25 : 0.18);
       const y = sim.blocks.lowestLiveBlockBottom();
       if (Number.isFinite(y)) particles.slamDust(now, y);
     }
@@ -258,6 +274,7 @@ export class Director {
     const fx = this.fx;
     this.atmosphere.update(ft, this.tiers.tier, this.meter.intensity, sim, camera, fx);
     this.finale.write(ft, fx);
+    this.shockwave.write(fx);
     fx.wallHits.set(this.wallHits);
     camera.update(ft.worldDt);
 

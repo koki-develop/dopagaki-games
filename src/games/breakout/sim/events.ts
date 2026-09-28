@@ -42,6 +42,10 @@ export const Signal = {
   PenaltyLanded: 1 << 4,
   /** エンドレスで、ブロックが 1 段降りて着地した */
   StepLanded: 1 << 5,
+  /** エンドレスで、天井より下のブロックをすべて壊した（全消し）。同じステップで補充の行が落ち始める。位置は `signalX` / `signalY` */
+  AllClear: 1 << 6,
+  /** 全消しの補充の行が着地した。補充の途中でペナルティが重なったときは、PenaltyLanded と同時に立つ */
+  RefillLanded: 1 << 7,
 } as const;
 
 export class EventQueue {
@@ -60,7 +64,7 @@ export class EventQueue {
   time = 0;
   readonly counts = new Uint32Array(EVENT_KIND_COUNT);
   signals = 0;
-  /** StageClear の発生位置（最後に壊したブロックの中心） */
+  /** StageClear と AllClear の発生位置（最後に壊したブロックの中心） */
   signalX = 0;
   signalY = 0;
 
@@ -91,7 +95,7 @@ export class EventQueue {
     this.signals |= bits;
   }
 
-  /** 位置を伴う状態遷移（StageClear）を知らせる */
+  /** 位置を伴う状態遷移（StageClear、AllClear）を知らせる */
   signalAt(bits: number, x: number, y: number): void {
     this.signals |= bits;
     this.signalX = x;

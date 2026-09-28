@@ -10,13 +10,15 @@ function run(d: Descent, steps: number, rowsPerStep: number) {
   let moved = 0;
   let stepLandings = 0;
   let penaltyLandings = 0;
+  let refillLandings = 0;
   for (let i = 0; i < steps; i++) {
     const r = d.advance(STEP_DT, rowsPerStep, ROW, STEP_SECONDS);
     moved += r.delta;
     if (r.stepLanded) stepLandings++;
     if (r.penaltyLanded) penaltyLandings++;
+    if (r.refillLanded) refillLandings++;
   }
-  return { moved, stepLandings, penaltyLandings };
+  return { moved, stepLandings, penaltyLandings, refillLandings };
 }
 
 describe('降下速度', () => {
@@ -68,6 +70,7 @@ describe('Descent', () => {
     const r = run(d, 60, 0);
     moved += r.moved;
     expect(r.penaltyLandings).toBe(1);
+    expect(r.refillLandings).toBe(0);
     expect(r.stepLandings).toBe(0);
     expect(moved).toBeCloseTo(5 + 3, 9);
   });
@@ -95,10 +98,11 @@ describe('Descent', () => {
     const r = run(d, 60, 0);
     expect(r.moved).toBeCloseTo(12, 9);
     expect(r.penaltyLandings).toBe(0);
+    expect(r.refillLandings).toBe(1);
     expect(d.refilling).toBe(false);
   });
 
-  test('補充にペナルティが重なると、合わせた距離をペナルティとして落とす', () => {
+  test('補充にペナルティが重なると、合わせた距離をペナルティとして落とし、着地はペナルティと補充の両方として知らせる', () => {
     const d = new Descent();
     d.startRefill(12, 0.45);
     d.startPenalty(3, 0.28);
@@ -106,6 +110,7 @@ describe('Descent', () => {
     const r = run(d, 60, 0);
     expect(r.moved).toBeCloseTo(15, 9);
     expect(r.penaltyLandings).toBe(1);
+    expect(r.refillLandings).toBe(1);
     expect(d.refilling).toBe(false);
   });
 

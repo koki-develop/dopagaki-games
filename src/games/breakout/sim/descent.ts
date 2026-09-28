@@ -23,6 +23,8 @@ type DescentResult = {
   stepLanded: boolean;
   /** ペナルティの落下が着地した */
   penaltyLanded: boolean;
+  /** 全消しの補充の落下が着地した。補充にペナルティが重なったときは penaltyLanded と同時に立つ */
+  refillLanded: boolean;
 };
 
 /**
@@ -57,7 +59,7 @@ export class Descent {
   /** 1 ステップの上限を超えて持ち越している距離 */
   private owed = 0;
 
-  private readonly result: DescentResult = { delta: 0, stepLanded: false, penaltyLanded: false };
+  private readonly result: DescentResult = { delta: 0, stepLanded: false, penaltyLanded: false, refillLanded: false };
 
   /** 全消しの補充の行が落ちてきている最中 */
   get refilling(): boolean {
@@ -82,6 +84,7 @@ export class Descent {
     const out = this.result;
     out.stepLanded = false;
     out.penaltyLanded = false;
+    out.refillLanded = false;
     this.progress += rows;
     if (!this.major && this.progress >= 1) {
       const n = Math.floor(this.progress);
@@ -99,6 +102,7 @@ export class Descent {
       if (p >= 1) {
         this.major = false;
         if (this.majorPenalty) out.penaltyLanded = true;
+        if (this.majorRefill) out.refillLanded = true;
         this.majorPenalty = false;
         this.majorRefill = false;
       }
