@@ -88,7 +88,9 @@ export class BackgroundView {
     const tex = this.densityTex;
     const colorNode = Fn(() => {
       const p = positionWorld.xy.toVar();
-      const inField = step(0, p.x).mul(step(p.x, FIELD_W)).mul(step(0, p.y)).mul(step(p.y, FIELD_H)).toVar();
+      // 左右の壁の間で天井より下。フィールドの下端より下も、奈落の続きとしてフィールドと同じに描く
+      const inWalls = step(0, p.x).mul(step(p.x, FIELD_W)).mul(step(p.y, FIELD_H)).toVar();
+      const inField = inWalls.mul(step(0, p.y)).toVar();
 
       // 段階 3 以上: ボールの密度の勾配に沿ってグリッドを歪める。
       // 条件は uniform だけで決まるので、分岐の中でテクスチャを読んでよい
@@ -115,7 +117,7 @@ export class BackgroundView {
 
       const hueT = u.hue.div(6.28318).add(p.y.mul(0.012)).add(0.7);
       const gridLevel = this.gridLevel.add(densWarp.mul(LOOK.background.gridDensity));
-      const outside = mix(float(0.35), float(1), inField);
+      const outside = mix(float(0.35), float(1), inWalls);
 
       // 下地のグラデーション
       const yN = p.y.div(FIELD_H).clamp(0, 1);
@@ -124,7 +126,7 @@ export class BackgroundView {
       If(this.tint.notEqual(0), () => {
         base.addAssign(neon(hueT.add(0.3)).mul(this.tint));
       });
-      const pit = smoothstep(PIT_TOP, 0, p.y).mul(inField);
+      const pit = smoothstep(PIT_TOP, 0, p.y).mul(inWalls);
       const col = base.mul(float(1).sub(pit.mul(0.6))).toVar();
       // 線から離れた画素では線の重みがちょうど 0 で、足しても値が変わらないので計算しない。
       // 太い線（g が 4 の倍数）は細い線（g が整数）と重なるので、太い線までの距離は細い線までの距離以上で fm ≥ f。
