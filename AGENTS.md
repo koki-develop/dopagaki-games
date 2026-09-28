@@ -7,7 +7,7 @@
 - 初回は `mise bootstrap`。`mise.toml` の道具（bun、node、lefthook、betterleaks）を入れたあと、依存のインストールと、コミット前に betterleaks（秘密情報の検出）を走らせる lefthook の設定をまとめて行う
 - `bun run dev`: 開発サーバー
 - `bunx tsc -b`: 型チェック
-- `bun run lint`: oxlint
+- `bun run lint`: oxlint と dependency-cruiser（依存の向きの検査）
 - `bun test`: テスト。1 ファイルだけなら `bun test <パス>`
 - `bun run build`: 型チェックと本番ビルド
 
@@ -25,10 +25,15 @@
 - `src/games/<ゲーム名>/`: ゲーム本体
 - `src/app/`: React の画面（ポータルと各ゲームの UI）とスタイル
 - `build/`: Vite のプラグイン（`build/site/plugin.ts`）。ページごとの HTML（題名・説明・canonical・OGP）、OG 画像、アイコン、`sitemap.xml`、`robots.txt` を作る。Node で動く
+- `lint/`: lint の設定が共有する素のモジュールの一覧（`pure-modules.ts`）
 
-依存は `shared` ← `juice` ← `games` ← `app`、`engine` ← `games` の向きだけにする。逆向きに import すると、下の層を単体で試せなくなる。`build/` は `src/` を読んでよいが、読むのはブラウザの機能も React も three.js も使わないモジュール（`src/app/site.ts` やゲームの素の値）だけにする。
+依存は `shared` ← `juice` ← `games` ← `app`、`shared` ← `engine` ← `games` の向きだけにする。逆向きに import すると、下の層を単体で試せなくなる。ゲームどうしも import し合わない。
+
+素のモジュールは、ブラウザの機能にも Node の機能にも、時刻にも乱数にも触れないモジュールで、`lint/pure-modules.ts` に挙げる（`src/shared/`、`src/app/site.ts`、ブロック崩しの sim と調整値）。素のモジュールが import してよいのは素のモジュールだけ。`build/` が読んでよい `src/` のモジュールも素のモジュールだけ。ビルドから読むモジュールや、決定的に動かしたいモジュールを増やすときは、この一覧に足す。
 
 three.js を import してよいのは `src/engine/` と、各ゲームの `view/` だけ。描画の都合をそこに閉じ込め、ゲームのロジック（状態の管理、シミュレーション、演出の計算、記録など）は three.js を知らない素の値でやり取りする。
+
+依存の決まりは `.dependency-cruiser.ts` で、素のモジュールが使ってよいグローバルは `oxlint.config.ts` で検査する。
 
 `src/app/` 以外で DOM や `window`、`localStorage`、`AudioContext` などのブラウザの機能を使うときは、引数やインターフェース（port）で外から受け取るか、存在を確かめてから使う。`bun test` には DOM がないので、こうしておくとモジュールを読み込めて、偽物を渡して試せる。
 
