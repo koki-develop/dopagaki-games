@@ -408,11 +408,10 @@ describe('ブロック', () => {
       '............',
       '.XX..XX..XX.',
       '.X........X.',
-      '...........o',
+      '...........9',
     ];
     const sim = makeSim(stageMode(rows), 5, (t) => {
       t.ball.speedStart = t.ball.speedMax;
-      t.blocks.ballsFromBall = 0;
     });
     const f = sim.blocks;
     const solids: number[] = [];
@@ -421,13 +420,14 @@ describe('ブロック', () => {
       const a = 0.35 + (k / 40) * (Math.PI - 0.7);
       placeBall(sim, 0.3 + ((k * 0.37) % 8.4), 13 - (k % 5) * 0.4, Math.cos(a), Math.sin(a));
     }
-    // o を壊すとすぐにクリアになり、その後はイベントを出さないので、当たった数は当たった時刻の更新で数える
     let solidHits = 0;
     runSteps(sim, 3000, () => {
-      for (const i of solids) if (f.hitAt[i] === Math.fround(sim.time)) solidHits++;
+      solidHits += sim.events.counts[EventKind.SolidHit];
       assertBallInvariants(sim);
       assertNoBallInsideBlocks(sim);
     });
+    // クリアするとボールが止まるので、最後まで当たり続けるよう、壊せるブロックは壊れずに残る硬さにしてある
+    expect(sim.phase).toBe('playing');
     expect(solidHits).toBeGreaterThan(200);
     for (const i of solids) expect(f.type[i]).toBe(BlockType.Solid);
   });
@@ -649,23 +649,35 @@ describe('ステージ', () => {
     expect([sim.blocks.liveCount, sim.blocks.breakableCount]).toEqual([6, 0]);
   });
 
-  test('クリアした後は、壊れないブロックに当たっても揺れの時刻だけを残し、イベントは出さない', () => {
+  test('クリアした後は、ボールがクリアしたステップの位置で止まり、何にも当たらない', () => {
     const sim = makeSim(stageMode(emptyRows(10).concat([line(8, 'X'), line(2, 'o')])), 1, (t) => {
       t.blocks.ballsFromBall = 0;
     });
+    const solid = sim.blocks.slotOf(1) * COLS + 8;
     placeBall(sim, cellCenterX(2), sim.blocks.centerY(0) - 1, 0, 1);
-    runSteps(sim, 60);
+    // 壊れないブロックへ向かうボールと、奈落へ向かうボール
+    placeBall(sim, cellCenterX(8), sim.blocks.centerY(1) - 2, 0, 1);
+    placeBall(sim, 5, 2, 0.3, -1);
+    for (let s = 0; s < 120 && sim.phase === 'playing'; s++) {
+      expect(sim.ballsMoving).toBe(true);
+      sim.step(hold(sim));
+      sim.events.clear();
+    }
     expect(sim.phase).toBe('cleared');
-    clearBalls(sim);
-    const idx = sim.blocks.slotOf(1) * COLS + 8;
-    const before = sim.blocks.hitAt[idx];
-    placeBall(sim, cellCenterX(8), sim.blocks.centerY(1) - 1, 0, 1);
-    let solidHits = 0;
-    runSteps(sim, 60, () => {
-      solidHits += sim.events.counts[EventKind.SolidHit];
+    expect(sim.ballsMoving).toBe(false);
+    const b = sim.balls;
+    expect(b.count).toBe(3);
+    const x = Array.from(b.x.subarray(0, b.count));
+    const y = Array.from(b.y.subarray(0, b.count));
+    const hitAt = sim.blocks.hitAt[solid];
+    runSteps(sim, 600, () => {
+      expect(sim.events.length).toBe(0);
+      expect(sim.events.signals).toBe(0);
     });
-    expect(solidHits).toBe(0);
-    expect(sim.blocks.hitAt[idx]).toBeGreaterThan(before);
+    expect(b.count).toBe(3);
+    // 補間の前の位置も今の位置にそろい、描画でも動いて見えない
+    for (let i = 0; i < b.count; i++) expect([b.x[i], b.y[i], b.px[i], b.py[i]]).toEqual([x[i], y[i], x[i], y[i]]);
+    expect(sim.blocks.hitAt[solid]).toBe(hitAt);
   });
 
   test('壊れないブロックの破砕は、決着した後に中心が条件に合うものだけを取り除き、得点は変えない', () => {
@@ -714,18 +726,19 @@ describe('ステージ', () => {
     expect(sim.events.signalY).toBe(0);
   });
 
-  test('ゲームオーバー後はボールが動いてもブロックは壊れない', () => {
+  test('ゲームオーバーの後は、ボールが動かず、ブロックも壊れない', () => {
     const sim = gameOverWhileAttached();
+    expect(sim.ballsMoving).toBe(false);
     const live = sim.blocks.liveCount;
     const score = sim.score;
-    let hits = 0;
     placeBall(sim, 4.5, 3, 0.3, 1);
+    const b = sim.balls;
     runSteps(sim, 600, () => {
-      hits += sim.events.counts[EventKind.BlockBreak] + sim.events.counts[EventKind.HardHit];
+      expect(sim.events.length).toBe(0);
     });
+    expect([b.count, b.x[0], b.y[0]]).toEqual([1, 4.5, 3]);
     expect(sim.blocks.liveCount).toBe(live);
     expect(sim.score).toBe(score);
-    expect(hits).toBe(0);
   });
 
   test('不正なステージは sim を作る時点で分かりやすいエラーになる', () => {
@@ -750,7 +763,7 @@ describe('ステージクリアのボールボーナス', () => {
     return sim;
   }
 
-  test('クリアの時点で残っていたボールの数がボーナスの対象になり、その後ボールは奈落へ落ちない', () => {
+  test('クリアの時点で残っていたボールの数がボーナスの対象になり、その後ボールは減らない', () => {
     const sim = clearWithBalls(5);
     expect(sim.clearBonusRemaining).toBe(6);
     // パドルを端に寄せて、ボールを拾わない
@@ -758,7 +771,6 @@ describe('ステージクリアのボールボーナス', () => {
       sim.step({ paddleTargetX: 0, launch: false });
       sim.events.clear();
       expect(sim.balls.count).toBe(6);
-      for (let i = 0; i < sim.balls.count; i++) expect(sim.balls.y[i]).toBeGreaterThanOrEqual(R - EPS);
     }
     expect(sim.clearBonusRemaining).toBe(6);
   });

@@ -78,7 +78,7 @@ function ballMaterial(u: ViewUniforms, look: BallLook, center: Node<'vec2'>, mot
 
 /**
  * ボール。インスタンスごとに (x, y, 向き x, 向き y) と (動いているか) を持つ。
- * 動いているボールだけを速度の方向に少し引き伸ばし、パドルに乗って止まっているボールは真円で描く。
+ * 動いているボールだけを速度の方向に少し引き伸ばし、止まっているボール（パドルに乗って発射を待つボールと、決着した後のボール）は真円で描く。
  */
 export class BallsView {
   readonly mesh: THREE.Mesh;
@@ -94,19 +94,21 @@ export class BallsView {
 
   /**
    * ボールの位置を書き出す。alpha は固定ステップ間の補間係数。
+   * moving でなければ、止まっているので引き伸ばさずに描く。
    * attachedX / attachedY が有限なら、発射待ちのボールも 1 個描く。
    */
-  update(balls: BallSource, alpha: number, attachedX: number, attachedY: number): void {
+  update(balls: BallSource, alpha: number, moving: boolean, attachedX: number, attachedY: number): void {
     const d = this.inst.data;
     const stride = this.inst.stride;
     const n = balls.count;
+    const m = moving ? 1 : 0;
     for (let i = 0; i < n; i++) {
       const o = i * stride;
       d[o] = balls.px[i] + (balls.x[i] - balls.px[i]) * alpha;
       d[o + 1] = balls.py[i] + (balls.y[i] - balls.py[i]) * alpha;
       d[o + 2] = balls.dx[i];
       d[o + 3] = balls.dy[i];
-      d[o + 4] = 1;
+      d[o + 4] = m;
     }
     let total = n;
     if (Number.isFinite(attachedX)) {

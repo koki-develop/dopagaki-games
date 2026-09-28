@@ -157,7 +157,7 @@ export class BreakoutView {
     this.flash.update();
     this.blocks.update(sim.blocks, src.presentOffset);
     const attached = sim.attached && sim.phase === 'playing';
-    this.balls.update(sim.balls, alpha, attached ? paddleX : Number.NaN, sim.attachedBallY);
+    this.balls.update(sim.balls, alpha, sim.ballsMoving, attached ? paddleX : Number.NaN, sim.attachedBallY);
     this.ballLook.stretch.value = 0.08 * (sim.speed / cfg.ball.speedStart);
     // 50 個までは 1、上限（500 個）で約 0.45
     this.ballLook.brightness.value = 1 / Math.sqrt(1 + Math.max(0, sim.ballCount - 50) / 115);

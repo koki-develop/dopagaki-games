@@ -65,6 +65,15 @@ export class BallStore implements ReadonlyBallStore {
     this.count = w;
   }
 
+  /** 動かさないステップで呼ぶ。直前の位置を今の位置にそろえ、補間描画でボールが動いて見えないようにする */
+  hold(): void {
+    const n = this.count;
+    for (let i = 0; i < n; i++) {
+      this.px[i] = this.x[i];
+      this.py[i] = this.y[i];
+    }
+  }
+
   clear(): void {
     this.count = 0;
   }

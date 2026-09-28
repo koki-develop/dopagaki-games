@@ -145,6 +145,11 @@ export class Sim {
     return this._phase;
   }
 
+  /** ボールが動いているか。決着した後は、決着したステップの位置で止まる */
+  get ballsMoving(): boolean {
+    return this._phase === 'playing';
+  }
+
   /** sim の経過時間（秒） */
   get time(): number {
     return this._time;
@@ -225,7 +230,8 @@ export class Sim {
       if (this.mode.kind === 'endless') this.stepDescent(dt);
     }
 
-    this.stepBalls(dt);
+    if (this._phase === 'playing') this.stepBalls(dt);
+    else this.ballStore.hold();
 
     this.scoring.decay(this._time);
     if (this._phase === 'playing') this.checkRules();
@@ -399,8 +405,6 @@ export class Sim {
     const dist = this._speed * dt;
     const sub = Math.max(1, Math.ceil(dist / MAX_SUBSTEP_DIST));
     const h = dist / sub;
-    // クリアした後は、ボールを奈落へ落とさない（残っていたボールはすべてボールボーナスになる）
-    const floor = this._phase === 'cleared';
     let anyDead = false;
     for (let i = 0; i < n; i++) {
       b.px[i] = b.x[i];
@@ -408,7 +412,7 @@ export class Sim {
       for (let s = 0; s < sub; s++) {
         b.x[i] += b.dx[i] * h;
         b.y[i] += b.dy[i] * h;
-        c.walls(i, floor);
+        c.walls(i);
         c.blocks(i);
         c.paddle(i);
         if (b.y[i] < -R) {
@@ -430,12 +434,10 @@ export class Sim {
    * 下から当てると新しいボールはパドル側へ降ってくるので、拾わないと増えない。
    * 裏に回り込んで上面に当てると上へ飛び、天井とブロックの間で爆発的に増える。
    * 壊れないブロックは跳ね返すだけで、当たった点（hitX, hitY）を知らせる。
-   * 決着した後は、揺れの演出のために当たった時刻だけを残す。
    */
   private hitBlock(idx: number, row: number, col: number, dirX: number, dirY: number, hitX: number, hitY: number): void {
     const f = this.field;
     f.markHit(idx, this._time);
-    if (this._phase !== 'playing') return;
     const type = f.type[idx] as BlockType;
     if (type === BlockType.Empty) return;
     if (type === BlockType.Solid) {

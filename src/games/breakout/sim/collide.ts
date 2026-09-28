@@ -119,8 +119,8 @@ export class Collider {
     b.dx[i] = b.dx[i] < 0 ? -this.minCos : this.minCos;
   }
 
-  /** 左右の壁と天井。floor なら、奈落の底（y = 0）でも跳ね返す */
-  walls(i: number, floor: boolean): void {
+  /** 左右の壁と天井 */
+  walls(i: number): void {
     const b = this.balls;
     let bounced = false;
     if (b.x[i] < R) {
@@ -138,10 +138,6 @@ export class Collider {
       b.y[i] = 2 * (FIELD_H - R) - b.y[i];
       b.dy[i] = -Math.abs(b.dy[i]);
       this.events.push(EventKind.WallHit, b.x[i], FIELD_H, 0, 1);
-      bounced = true;
-    } else if (floor && b.y[i] < R) {
-      b.y[i] = 2 * R - b.y[i];
-      b.dy[i] = Math.abs(b.dy[i]);
       bounced = true;
     }
     if (bounced) this.clampAngle(i);
