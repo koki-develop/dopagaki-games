@@ -78,14 +78,14 @@ export const tuning = {
     /** 降下速度（行 / 秒）。ブロックはこの速さぶんの時間ごとに 1 段ずつ落ちる。時間とともに上限なく上がり続ける */
     descentStart: 0.1,
     /** 1 分ごとに増える降下速度（行 / 秒） */
-    descentAccelPerMinute: 0.2,
+    descentAccelPerMinute: 0.3,
     /** 1 段の降下にかける時間。短く、ガクンと落とす */
     stepDropSeconds: 0.12,
     penaltyRows: 3,
     penaltyDropSeconds: 0.28,
     hardRatioStart: 0.14,
     hardRatioMax: 0.8,
-    hardRatioRampSeconds: 540,
+    hardRatioRampSeconds: 300,
     megaRatio: 0.01,
     /** ブロックの帯の行数（この範囲からランダム）。帯と帯の間に、横一直線の空の行を挟む */
     bandRowsMin: 4,
@@ -95,13 +95,17 @@ export const tuning = {
     gapRowsMax: 2,
     /** ハードの HP は hardHpStart × (1 + 時間 / hardHpScaleSeconds) ^ hardHpPower */
     hardHpStart: 2,
-    hardHpScaleSeconds: 30,
+    hardHpScaleSeconds: 45,
     hardHpPower: 1.7,
     /** ハードの HP の上限。これより硬いブロックは作らない */
     hardHpMax: 24,
     /** 全消しの直後に天井の外から落とし入れる行数 */
     refillRows: 12,
     refillDropSeconds: 0.45,
+    /** この秒数ごとに、外周をハードで囲み中をメガで埋めた帯（ジャックポット）を 1 つ出す */
+    jackpotIntervalSeconds: 120,
+    /** ジャックポットの帯の行数（上下の縁の行を含む） */
+    jackpotRows: 7,
   },
   stage: {
     lives: 3,
@@ -178,6 +182,8 @@ export const TUNING_LIMITS: { readonly [S in keyof Tuning]: { readonly [K in key
     hardHpMax: { min: 1, max: 255, int: true },
     refillRows: { min: 1, max: FIELD_ROWS, int: true },
     refillDropSeconds: { min: 0, max: 5 },
+    jackpotIntervalSeconds: { min: 1, max: 36000 },
+    jackpotRows: { min: 3, max: FIELD_ROWS, int: true },
   },
   stage: {
     lives: { min: 1, max: 99, int: true },

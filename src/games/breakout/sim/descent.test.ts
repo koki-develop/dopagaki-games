@@ -22,12 +22,12 @@ function run(d: Descent, steps: number, rowsPerStep: number) {
 }
 
 describe('降下速度', () => {
-  test('0.1 行/秒から始まり、1 分ごとに 0.2 行/秒ずつ上限なく上がる', () => {
+  test('0.1 行/秒から始まり、1 分ごとに 0.3 行/秒ずつ上限なく上がる', () => {
     const e = sanitizeTuning(tuning).endless;
     expect(descentRateAt(e, 0)).toBeCloseTo(0.1, 12);
-    expect(descentRateAt(e, 60)).toBeCloseTo(0.3, 12);
-    expect(descentRateAt(e, 600)).toBeCloseTo(2.1, 12);
-    expect(descentRateAt(e, 6000)).toBeCloseTo(20.1, 12);
+    expect(descentRateAt(e, 60)).toBeCloseTo(0.4, 12);
+    expect(descentRateAt(e, 600)).toBeCloseTo(3.1, 12);
+    expect(descentRateAt(e, 6000)).toBeCloseTo(30.1, 12);
   });
 });
 

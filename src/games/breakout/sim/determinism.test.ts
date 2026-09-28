@@ -50,9 +50,9 @@ describe('決定性', () => {
     const { sim, steps } = play({ kind: 'endless' }, 20260928, 12000, autoplayInput);
     expect(steps).toBe(12000);
     expect(sim.phase).toBe('playing');
-    expect(sim.score).toBe(1275038);
+    expect(sim.score).toBe(1361233);
     expect(sim.ballCount).toBe(500);
-    expect(sim.blocks.liveCount).toBe(30);
+    expect(sim.blocks.liveCount).toBe(56);
     expect(sim.time).toBeCloseTo(100, 9);
   });
 
