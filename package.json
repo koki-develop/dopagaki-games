@@ -28,6 +28,8 @@
     "@vitejs/plugin-react": "6.1.1",
     "babel-plugin-react-compiler": "1.0.0",
     "oxlint": "1.85.0",
+    "satori": "0.33.5",
+    "sharp": "0.35.5",
     "typescript": "6.0.3",
     "vite": "8.3.1"
   }

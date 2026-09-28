@@ -1,12 +1,14 @@
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import { defineConfig } from 'vite'
+import { sitePlugin } from './build/site/plugin.ts'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
-    babel({ presets: [reactCompilerPreset()] })
+    babel({ presets: [reactCompilerPreset()] }),
+    sitePlugin(),
   ],
   build: {
     // 配信物に含まれる依存（フォントを含む）のライセンス表示。本文ごと Markdown で配信物に同梱する

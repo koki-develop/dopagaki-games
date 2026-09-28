@@ -13,6 +13,7 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
+    "jsx": "react-jsx",
 
     /* Linting */
     "noUnusedLocals": true,
@@ -24,5 +25,5 @@
     "exactOptionalPropertyTypes": true,
     "allowUnreachableCode": false
   },
-  "include": ["src/**/*.test.ts", "src/**/*.test-support.ts"]
+  "include": ["src/**/*.test.ts", "src/**/*.test-support.ts", "build/**/*.test.ts", "build/**/*.test-support.ts"]
 }

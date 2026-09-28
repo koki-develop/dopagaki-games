@@ -10,7 +10,7 @@
   },
   "overrides": [
     {
-      "files": ["src/**/*.test.ts", "src/**/*.test-support.ts"],
+      "files": ["src/**/*.test.ts", "src/**/*.test-support.ts", "build/**/*.test.ts", "build/**/*.test-support.ts"],
       "rules": { "typescript/no-non-null-assertion": "off" }
     }
   ]
