@@ -40,9 +40,9 @@ describe('createRouter', () => {
     const router = createRouter(h.port);
     const seen: string[] = [];
     router.subscribe(() => seen.push(router.getRoute()));
-    router.navigate('breakout');
-    expect(h.log).toEqual(['push /breakout', 'scroll']);
-    expect(seen).toEqual(['breakout']);
+    router.navigate('reversi');
+    expect(h.log).toEqual(['push /reversi', 'scroll']);
+    expect(seen).toEqual(['reversi']);
   });
 
   test('いまと同じページへは何もしない', () => {

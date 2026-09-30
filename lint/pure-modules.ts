@@ -9,6 +9,7 @@
 export const PURE_MODULES: readonly string[] = [
   'src/shared/',
   'src/app/site.ts',
+  'src/app/reversi/summary.ts',
   'src/games/breakout/config.ts',
   'src/games/breakout/controller.ts',
   'src/games/breakout/hud/layout.ts',
@@ -18,6 +19,23 @@ export const PURE_MODULES: readonly string[] = [
   'src/games/breakout/session-state.ts',
   'src/games/breakout/types.ts',
   'src/games/breakout/fx/fracture.ts',
+  'src/games/reversi/rules/',
+  'src/games/reversi/ai/',
+  'src/games/reversi/combo.ts',
+  'src/games/reversi/config.ts',
+  'src/games/reversi/controller.ts',
+  'src/games/reversi/geometry.ts',
+  'src/games/reversi/hud/layout.ts',
+  'src/games/reversi/hud/model.ts',
+  'src/games/reversi/match.ts',
+  'src/games/reversi/records-model.ts',
+  'src/games/reversi/scoring.ts',
+  'src/games/reversi/session-state.ts',
+  'src/games/reversi/stable-tracker.ts',
+  'src/games/reversi/types.ts',
+  'src/games/reversi/fx/choreo.ts',
+  'src/games/reversi/fx/cue-queue.ts',
+  'src/games/reversi/fx/score-ticker.ts',
 ];
 
 const isDirectory = (path: string): boolean => path.endsWith('/');

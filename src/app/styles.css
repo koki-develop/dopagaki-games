@@ -10,6 +10,9 @@
   --magenta-rgb: 255 92 225;
   --gold-rgb: 255 207 92;
   --score-rgb: 255 246 221;
+  /* リバーシの人の側の色と、黒い石の縁の色 */
+  --mint-rgb: 92 255 205;
+  --disc-rim-rgb: 214 92 255;
 
   --bg: rgb(var(--bg-rgb));
   --surface: #0a0619;
@@ -21,6 +24,10 @@
   --magenta: rgb(var(--magenta-rgb));
   --gold: rgb(var(--gold-rgb));
   --score: rgb(var(--score-rgb));
+  --mint: rgb(var(--mint-rgb));
+  --disc-rim: rgb(var(--disc-rim-rgb));
+  /* パーフェクトなどの虹色。横に 2 周期分並べ、background-position を流して動かす */
+  --rainbow: linear-gradient(90deg, #ff5cf0, #ffd24d, #5cffcd, #5cc8ff, #ff5cf0) 0 0 / 200% 100%;
   --on-accent: #05030d;
 
   --display: 'Dela Gothic One', system-ui, sans-serif;
@@ -913,6 +920,968 @@ p {
 }
 
 /* =========================================================================
+   リバーシ: HUD と盤の上の文字
+   ========================================================================= */
+
+.rv-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* 広い画面では、盤の幅に近い幅で中央に置く */
+  max-width: 600px;
+  margin-inline: auto;
+  padding: calc(8px + var(--safe-top)) calc(10px + var(--safe-right)) 6px calc(10px + var(--safe-left));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 8px;
+  font-family: var(--display);
+}
+
+.rv-pause {
+  pointer-events: auto;
+}
+
+/* 石の数: 石のアイコンと数。数が増えた瞬間に跳ねる（--bump は HUD の書き込み係が変える） */
+.rv-score {
+  --bump: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rv-score-body {
+  display: grid;
+  line-height: 1;
+}
+
+.rv-score[data-side='cpu'] .rv-score-body {
+  text-align: right;
+}
+
+.rv-score-label {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+
+.rv-score-count {
+  font-size: clamp(24px, 8vw, 32px);
+  font-variant-numeric: tabular-nums;
+  min-width: 2ch;
+  color: var(--score);
+  transform: scale(calc(1 + 0.3 * var(--bump)));
+  transform-origin: 50% 60%;
+  will-change: transform;
+  text-shadow: 0 0 calc(4px + 14px * var(--bump)) rgb(var(--gold-rgb) / 0.6);
+}
+
+.rv-score[data-side='cpu'] .rv-score-count {
+  color: var(--text);
+  text-shadow: 0 0 calc(4px + 12px * var(--bump)) rgb(var(--magenta-rgb) / 0.5);
+}
+
+/* 石のアイコン。黒はマゼンタ寄りの紫、白はシアンの縁で光る */
+.rv-disc {
+  display: inline-block;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.rv-disc-black {
+  background: rgb(14 10 22);
+  border: 3px solid var(--disc-rim);
+  box-shadow: 0 0 8px rgb(var(--disc-rim-rgb) / 0.7);
+}
+
+.rv-disc-white {
+  background: rgb(236 240 250);
+  border: 3px solid var(--cyan);
+  box-shadow: 0 0 8px rgb(var(--cyan-rgb) / 0.7);
+}
+
+/*
+ * 綱引きのバー。人の側の割合（--share）で、真ん中の境目が動く。
+ * 毎フレーム変わるので、幅ではなく変形で伸び縮みさせる。人の側は左端から、CPU の側は右端から、
+ * それぞれの割合だけ縮める。色の変化は縮めた側の中で端から端までかかる
+ */
+.rv-bar {
+  --share: 0.5;
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: rgb(var(--text-rgb) / 0.1);
+}
+
+.rv-bar-human,
+.rv-bar-cpu {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.rv-bar-human {
+  transform: scaleX(var(--share));
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, rgb(var(--mint-rgb) / 0.5), var(--mint));
+}
+
+.rv-bar-cpu {
+  transform: scaleX(calc(1 - var(--share)));
+  transform-origin: 100% 50%;
+  background: linear-gradient(90deg, var(--magenta), rgb(var(--magenta-rgb) / 0.45));
+}
+
+/*
+ * 上端の段の下の段。左に得点、右端にコンボのゲージを置く。
+ * 得点の桁が増えてゲージと並びきらなくなったら、ゲージを次の行へ送って重ならないようにする
+ */
+.rv-hud-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 4px;
+  margin-top: 6px;
+}
+
+/*
+ * 得点。増えている間は跳ね（--bump）、自己ベストを超えたら SCORE の文字の位置に BEST を出す。
+ * BEST は並びの幅を取らないので、出ても数の位置は変わらない。6 桁の得点は幅 320px の画面でもゲージと同じ行に収まる
+ */
+.rv-points {
+  --bump: 0;
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  line-height: 1;
+}
+
+.rv-points-label {
+  flex: none;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+
+.rv-points[data-best='true'] .rv-points-label {
+  visibility: hidden;
+}
+
+.rv-points-value {
+  font-size: clamp(22px, 7vw, 32px);
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  white-space: nowrap;
+  transform: scale(calc(1 + 0.18 * var(--bump)));
+  transform-origin: 0 70%;
+  will-change: transform;
+  text-shadow: 0 0 calc(6px + 16px * var(--bump)) rgb(var(--gold-rgb) / 0.7);
+}
+
+.rv-points-best {
+  position: absolute;
+  left: 0;
+  align-self: center;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #1a1204;
+  background: var(--gold);
+  box-shadow: 0 0 10px rgb(var(--gold-rgb) / 0.8);
+  visibility: hidden;
+}
+
+.rv-points[data-best='true'] .rv-points-best {
+  visibility: visible;
+  animation: rv-best-in 0.45s cubic-bezier(0.2, 1.8, 0.4, 1);
+}
+
+/*
+ * コンボのゲージ。コンボを次へつなぐ窓の残り（--window）だけ伸び、窓がない間は見せない。
+ * フィーバーの強さ（--fever）でミントから金へ寄せ、光を強くする。
+ * 残りは右端にそろえる。毎フレーム変わるので、溝と同じ幅の中身を右へずらして、溝からはみ出た分を隠す（左端の丸みと光は保つ）
+ */
+.rv-gauge {
+  --window: 0;
+  --fever: 0;
+  --gauge: color-mix(in srgb, var(--gold) calc(var(--fever) * 100%), var(--mint));
+  flex: none;
+  margin-left: auto;
+  display: grid;
+  gap: 3px;
+  width: clamp(88px, 30vw, 150px);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.rv-gauge[data-open='true'] {
+  opacity: 1;
+}
+
+.rv-gauge-label {
+  justify-self: end;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--gauge);
+}
+
+.rv-gauge-track {
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgb(var(--text-rgb) / 0.12);
+}
+
+.rv-gauge-fill {
+  display: block;
+  height: 100%;
+  transform: translateX(calc((1 - var(--window)) * 100%));
+  will-change: transform;
+  border-radius: 3px;
+  background: var(--gauge);
+  box-shadow: 0 0 calc(6px + 10px * var(--fever)) var(--gauge);
+}
+
+@keyframes rv-best-in {
+  from {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* 盤の下に空けておく余白（安全領域を含む）。盤はこの上端までに収める */
+.rv-bottom {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(12px + var(--safe-bottom));
+  pointer-events: none;
+}
+
+/* 盤の上の文字。位置はゲームが決め、ここでは中心をそろえて弾ませる */
+.rv-callouts {
+  /*
+   * 終局の決着の中心の高さと文字の大きさ（行の高さは 0.9 なので、文字の高さは大きさの 0.9 倍）。
+   * 集計は、下端が決着の上端から 14px 上になる位置に置く
+   */
+  --verdict-top: 56%;
+  --verdict-size: clamp(56px, 23vw, 150px);
+  --tally-y: calc(-100% - var(--verdict-size) * 0.45 - 14px);
+  /* 光らせない文字を、盤の明るい石から切り離す暗い縁（背景の色） */
+  --dark-edge:
+    0 0 2px rgb(var(--bg-rgb)),
+    0 0 4px rgb(var(--bg-rgb)),
+    0 0 10px rgb(var(--bg-rgb) / 0.9);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.rv-callout {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.9;
+  font-family: var(--display);
+  color: #fff;
+  white-space: nowrap;
+  transform: translate(-50%, -110%);
+  animation: rv-callout 1.1s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.rv-callout-sub {
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  margin-right: -0.3em;
+}
+
+/*
+ * 返した枚数の数え上げ。数が届くたびに跳ね（data-bump）、段階（data-level）が上がるほど大きく、色が変わる。
+ * 大きさは遷移させずに一度に変える（画面の端に収める位置を、書き換えた直後の幅で決めるため）
+ */
+.rv-callout[data-kind='flips'] {
+  --count-size: 30px;
+  animation: rv-count-in 0.25s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.8),
+    0 0 18px var(--mint),
+    0 0 38px rgb(var(--mint-rgb) / 0.5);
+}
+
+.rv-callout[data-kind='flips'][data-leaving] {
+  animation: rv-count-out 0.45s ease-in both;
+}
+
+.rv-callout-count {
+  font-size: var(--count-size);
+  font-variant-numeric: tabular-nums;
+}
+
+.rv-callout-count[data-bump] {
+  animation: rv-bump 0.22s cubic-bezier(0.2, 1.8, 0.4, 1);
+}
+
+.rv-callout[data-level='1'] {
+  --count-size: 40px;
+}
+
+.rv-callout[data-level='2'] {
+  --count-size: 58px;
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.9),
+    0 0 20px var(--mint),
+    0 0 44px rgb(var(--cyan-rgb) / 0.6);
+}
+
+.rv-callout[data-level='3'] {
+  --count-size: min(92px, 26vw);
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.9),
+    0 0 22px var(--gold),
+    0 0 52px rgb(var(--gold-rgb) / 0.65);
+}
+
+.rv-callout[data-level='4'] {
+  --count-size: min(132px, 36vw);
+  text-shadow:
+    0 0 8px rgba(255, 255, 255, 0.95),
+    0 0 24px var(--magenta),
+    0 0 60px rgb(var(--gold-rgb) / 0.7),
+    0 0 90px rgb(var(--cyan-rgb) / 0.4);
+}
+
+@keyframes rv-count-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -80%) scale(2.4);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -110%) scale(1);
+  }
+}
+
+@keyframes rv-count-out {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -110%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -170%) scale(0.85);
+  }
+}
+
+@keyframes rv-bump {
+  0% {
+    transform: scale(1.5);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.rv-callout[data-kind='corner'] {
+  font-size: 30px;
+  letter-spacing: 0.15em;
+  color: var(--gold);
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.8),
+    0 0 20px var(--gold);
+  animation-duration: 1.3s;
+}
+
+.rv-callout[data-kind='pass'] {
+  left: 50%;
+  top: 45%;
+  font-size: clamp(48px, 16vw, 80px);
+  letter-spacing: 0.1em;
+  transform: translate(-50%, -50%);
+  animation-name: rv-pass;
+}
+
+.rv-callout[data-kind='pass'][data-who='human'] {
+  color: var(--muted);
+}
+
+.rv-callout[data-kind='pass'][data-who='cpu'] {
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.8),
+    0 0 20px var(--mint);
+}
+
+/* 得点: 金色の数を叩き込み、倍率が掛かっていれば下に、早打ちなら上に小さく出す */
+.rv-callout[data-kind='score'] {
+  color: var(--gold);
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.85),
+    0 0 18px var(--gold);
+  animation-name: rv-score-slam;
+}
+
+.rv-callout-points {
+  font-size: clamp(26px, 8.5vw, 38px);
+  font-variant-numeric: tabular-nums;
+}
+
+.rv-callout-quick {
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  color: var(--magenta);
+  text-shadow: 0 0 10px rgb(var(--magenta-rgb) / 0.85);
+}
+
+.rv-callout[data-kind='score'][data-boost='true'] .rv-callout-sub {
+  font-size: 15px;
+  color: var(--mint);
+  text-shadow: 0 0 10px rgb(var(--mint-rgb) / 0.8);
+}
+
+/* 置いた石のコンボ: 石のすぐ下へ叩き込む。数が主役で、COMBO は小さく添える */
+.rv-callout[data-kind='combo'] {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 4px;
+  font-size: clamp(22px, 7vw, 30px);
+  font-variant-numeric: tabular-nums;
+  transform: translate(-50%, 55%);
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.9),
+    0 0 16px var(--mint);
+  animation-name: rv-combo-slam;
+  animation-duration: 0.9s;
+}
+
+.rv-callout[data-kind='combo'] .rv-callout-sub {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--mint);
+}
+
+@keyframes rv-combo-slam {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 55%) scale(2.6);
+  }
+  16% {
+    opacity: 1;
+    transform: translate(-50%, 55%) scale(0.9);
+  }
+  26% {
+    transform: translate(-50%, 55%) scale(1.06);
+  }
+  36% {
+    transform: translate(-50%, 55%) scale(1);
+  }
+  78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 75%) scale(0.96);
+  }
+}
+
+/*
+ * 終局の集計: 盤の上側で、人と CPU の石の数を並べて数え上げる。多い側は大きく明るく（人はミント、CPU はマゼンタに光る）、
+ * 少ない側は小さく灰色にする。数が届くたびに跳ね、数え終えたら強く跳ねて、儀式が終わるまで残る
+ */
+.rv-callout[data-kind='tally'] {
+  left: 50%;
+  top: var(--verdict-top);
+  transform: translate(-50%, var(--tally-y));
+  line-height: 1;
+  animation: rv-tally-in 0.3s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.rv-tally-counts {
+  display: flex;
+  align-items: flex-end;
+  column-gap: 10px;
+}
+
+.rv-tally-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  row-gap: 6px;
+}
+
+.rv-tally-dash {
+  margin-bottom: 0.3em;
+  font-size: clamp(22px, 7vw, 36px);
+  color: var(--muted);
+}
+
+.rv-callout[data-kind='tally'] .rv-callout-count {
+  font-size: clamp(44px, 14vw, 80px);
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  text-shadow: 0 0 10px rgb(var(--text-rgb) / 0.6);
+  transition:
+    font-size 0.2s ease-out,
+    color 0.2s ease-out;
+}
+
+.rv-callout[data-kind='tally'] .rv-callout-count[data-lead='ahead'] {
+  font-size: clamp(56px, 18vw, 104px);
+}
+
+.rv-callout[data-kind='tally'] .rv-callout-count[data-lead='ahead'][data-side='human'] {
+  text-shadow:
+    0 0 8px rgba(255, 255, 255, 0.9),
+    0 0 26px var(--mint),
+    0 0 60px rgb(var(--mint-rgb) / 0.45);
+}
+
+.rv-callout[data-kind='tally'] .rv-callout-count[data-lead='ahead'][data-side='cpu'] {
+  text-shadow:
+    0 0 8px rgba(255, 255, 255, 0.7),
+    0 0 26px var(--magenta),
+    0 0 60px rgb(var(--magenta-rgb) / 0.45);
+}
+
+.rv-callout[data-kind='tally'] .rv-callout-count[data-lead='behind'] {
+  font-size: clamp(30px, 10vw, 54px);
+  color: var(--muted);
+  text-shadow: var(--dark-edge);
+}
+
+.rv-callout[data-kind='tally'][data-final] .rv-callout-count[data-bump] {
+  animation: rv-tally-final 0.5s cubic-bezier(0.2, 1.8, 0.4, 1);
+}
+
+.rv-callout[data-kind='tally'][data-leaving] {
+  animation: rv-tally-out 0.3s ease-in both;
+}
+
+/* 集計の出入りは、決着の真上の位置（translate(-50%, var(--tally-y))）のまま大きさだけを変える */
+@keyframes rv-tally-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, var(--tally-y)) scale(2.4);
+  }
+}
+
+@keyframes rv-tally-final {
+  from {
+    transform: scale(1.7);
+    filter: brightness(1.8);
+  }
+}
+
+@keyframes rv-tally-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, var(--tally-y)) scale(1.4);
+  }
+}
+
+/*
+ * 決着: 集計の下に叩きつけ、儀式が終わるまで集計と並べて残す。勝ちは金、パーフェクトは虹色、負けは光らせない。
+ * いちばん長い PERFECT も画面の幅に収める
+ */
+.rv-callout[data-kind='verdict'] {
+  left: 50%;
+  top: var(--verdict-top);
+  font-size: var(--verdict-size);
+  letter-spacing: 0.04em;
+  transform: translate(-50%, -50%);
+  animation: rv-verdict-slam 0.75s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+.rv-callout[data-kind='verdict'][data-outcome='win'] {
+  color: #fff;
+  text-shadow:
+    0 0 10px rgba(255, 255, 255, 0.9),
+    0 0 30px var(--gold),
+    0 0 70px rgb(var(--gold-rgb) / 0.6);
+}
+
+.rv-callout[data-kind='verdict'][data-outcome='perfect'] {
+  font-size: clamp(34px, 12.5vw, 100px);
+  color: transparent;
+  background: var(--rainbow);
+  background-clip: text;
+  -webkit-background-clip: text;
+  filter: drop-shadow(0 0 14px rgb(255 255 255 / 0.6));
+  animation-name: rv-verdict-slam, rv-rainbow-slide;
+  animation-duration: 0.75s, 1.2s;
+  animation-iteration-count: 1, infinite;
+  animation-timing-function: cubic-bezier(0.2, 1.4, 0.4, 1), linear;
+}
+
+/* 負けは光らせず、背景の暗い色の縁と下へ沈む影で、盤の石から文字を切り離す */
+.rv-callout[data-kind='verdict'][data-outcome='lose'] {
+  color: #c4c2e6;
+  text-shadow:
+    var(--dark-edge),
+    0 6px 24px rgb(var(--bg-rgb) / 0.85);
+}
+
+.rv-callout[data-kind='verdict'][data-outcome='draw'] {
+  text-shadow: 0 0 20px rgb(var(--text-rgb) / 0.5);
+}
+
+.rv-callout[data-kind='verdict'][data-leaving] {
+  animation: rv-verdict-out 0.3s ease-in both;
+}
+
+@keyframes rv-verdict-slam {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(4) rotate(-10deg);
+  }
+  36% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.88) rotate(2deg);
+  }
+  57% {
+    transform: translate(-48%, -50%) scale(1.08) rotate(-1deg);
+  }
+  79% {
+    transform: translate(-52%, -50%) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes rv-verdict-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
+
+@keyframes rv-rainbow-slide {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes rv-score-slam {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -110%) scale(3) rotate(-8deg);
+  }
+  14% {
+    opacity: 1;
+    transform: translate(-50%, -110%) scale(0.92) rotate(0);
+  }
+  22% {
+    transform: translate(-50%, -110%) scale(1.08);
+  }
+  30% {
+    transform: translate(-50%, -110%) scale(1);
+  }
+  75% {
+    opacity: 1;
+    transform: translate(-50%, -130%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -150%) scale(0.95);
+  }
+}
+
+@keyframes rv-callout {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -80%) scale(2.2);
+  }
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -110%) scale(1);
+  }
+  75% {
+    opacity: 1;
+    transform: translate(-50%, -135%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -160%) scale(0.9);
+  }
+}
+
+@keyframes rv-pass {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.6) rotate(-4deg);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+}
+
+/* =========================================================================
+   リバーシ: 各画面
+   ========================================================================= */
+
+.rv-title-logo {
+  margin-bottom: 8px;
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.7),
+    0 0 18px var(--mint),
+    0 0 42px rgb(var(--mint-rgb) / 0.45);
+}
+
+.rv-title-logo span:last-child {
+  font-size: 1em;
+  text-shadow: inherit;
+}
+
+.rv-side {
+  width: 100%;
+}
+
+.rv-side .segmented label > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.rv-side .rv-disc {
+  width: 18px;
+  height: 18px;
+}
+
+.rv-start {
+  margin-top: 18px;
+  min-height: 56px;
+  font-size: 22px;
+  letter-spacing: 0.2em;
+  box-shadow: 0 0 22px rgb(var(--cyan-rgb) / 0.55);
+}
+
+/* タイトルの記録: 最高スコア・最大コンボ・勝敗 */
+.rv-records {
+  width: 100%;
+  margin: 18px 0 0;
+  display: grid;
+  gap: 6px;
+  font-family: var(--display);
+}
+
+.rv-records > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgb(var(--text-rgb) / 0.12);
+}
+
+.rv-records dt {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+
+.rv-records dd {
+  margin: 0;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.rv-records > div:first-child dd {
+  color: var(--gold);
+  font-size: 22px;
+  text-shadow: 0 0 10px rgb(var(--gold-rgb) / 0.5);
+}
+
+[data-outcome='win'] .rv-result-heading {
+  text-shadow:
+    0 0 8px rgba(255, 255, 255, 0.7),
+    0 0 22px var(--gold),
+    0 0 50px rgb(var(--gold-rgb) / 0.55);
+}
+
+[data-perfect='true'] .rv-result-heading {
+  text-shadow:
+    0 0 8px rgba(255, 255, 255, 0.8),
+    0 0 22px var(--magenta),
+    0 0 44px var(--gold),
+    0 0 70px rgb(var(--cyan-rgb) / 0.5);
+}
+
+/* 負けの見出しは光らせない */
+[data-outcome='lose'] .rv-result-heading {
+  color: var(--muted);
+  text-shadow: none;
+}
+
+[data-outcome='draw'] .rv-result-heading {
+  text-shadow:
+    0 0 8px rgba(255, 255, 255, 0.5),
+    0 0 20px rgb(var(--text-rgb) / 0.5);
+}
+
+.rv-result-dash {
+  color: var(--muted);
+}
+
+/* 石の数: 小さな 1 行 */
+.rv-result-discs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  column-gap: 10px;
+  animation: pop-in var(--result-pop-duration) var(--result-discs-delay) cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.rv-result-count {
+  font-family: var(--display);
+  font-size: clamp(24px, 8vw, 34px);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--text);
+}
+
+/* 多い側は大きく明るく（人はミント、CPU はマゼンタに光る）、少ない側は小さく灰色にする */
+.rv-result-count[data-lead='ahead'] {
+  font-size: clamp(36px, 12vw, 52px);
+  color: #fff;
+}
+
+.rv-result-count[data-lead='ahead'][data-side='human'] {
+  text-shadow:
+    0 0 8px rgba(255, 255, 255, 0.8),
+    0 0 20px var(--mint);
+}
+
+.rv-result-count[data-lead='ahead'][data-side='cpu'] {
+  text-shadow:
+    0 0 8px rgba(255, 255, 255, 0.6),
+    0 0 20px var(--magenta);
+}
+
+.rv-result-count[data-lead='behind'] {
+  font-size: clamp(20px, 6.5vw, 28px);
+  color: var(--muted);
+}
+
+/* 得点の内訳。行ごとに少しずつ遅れて弾けて出る。種類は名前の文字の色だけで見分け、点は白で揃える */
+.rv-sheet {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  width: 100%;
+  max-width: 320px;
+  display: grid;
+  gap: 4px;
+  font-family: var(--display);
+}
+
+.rv-sheet li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 14px;
+  animation: rv-line-in 0.32s calc(var(--result-sheet-at) + var(--i) * var(--result-line-step)) cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.rv-sheet-label {
+  min-width: 0;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+.rv-sheet-points {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.rv-sheet li[data-kind='moves'] .rv-sheet-label {
+  color: var(--mint);
+}
+
+.rv-sheet li[data-kind='quick'] .rv-sheet-label {
+  color: var(--magenta);
+}
+
+.rv-sheet li[data-kind='discs'] .rv-sheet-label {
+  color: #fff;
+}
+
+.rv-sheet li[data-kind='win'] .rv-sheet-label {
+  color: var(--gold);
+}
+
+.rv-sheet li[data-kind='combo'] .rv-sheet-label {
+  color: var(--cyan);
+}
+
+.rv-sheet li[data-kind='perfect'] .rv-sheet-label,
+.rv-sheet li[data-kind='fullCombo'] .rv-sheet-label {
+  color: transparent;
+  background: var(--rainbow);
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: rv-rainbow-slide 1.2s linear infinite;
+}
+
+@keyframes rv-line-in {
+  from {
+    opacity: 0;
+    transform: translateX(-24px) scale(1.2);
+  }
+}
+
+/* 合計の得点。内訳を出しきってから数え上げる */
+.rv-result-total {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 16px;
+  animation: pop-in var(--result-pop-duration) var(--result-total-at) cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.rv-result-total-value {
+  font-family: var(--display);
+  font-size: clamp(40px, 13vw, 68px);
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  line-height: 1;
+  text-shadow: 0 0 18px rgb(var(--gold-rgb) / 0.55);
+  overflow-wrap: anywhere;
+}
+
+[data-outcome='lose'] .rv-result-total-value {
+  color: var(--text);
+  text-shadow: none;
+}
+
+/* =========================================================================
    開発用パネル（開発ビルドのみ）
    ========================================================================= */
 
@@ -1023,7 +1992,8 @@ p {
 }
 
 /*
- * 動きを減らす設定では、アニメーション・HUD の数の跳ね・ゲーム一覧の矢印の滑りを止める。要素は最後の状態で表示する
+ * 動きを減らす設定では、アニメーション・HUD の数の跳ね・ゲーム一覧の矢印の滑りを止める。要素は最後の状態で表示する。
+ * 盤の上の文字も、種類ごとの止まった位置（.rv-callout の transform）にそのまま出る
  */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -1032,11 +2002,14 @@ p {
     animation: none !important;
   }
 
-  .hud-score {
+  .hud-score,
+  .rv-score-count,
+  .rv-points-value {
     transform: none;
   }
 
-  .portal-game-arrow {
+  .portal-game-arrow,
+  .rv-callout[data-kind='tally'] .rv-callout-count {
     transition: none;
   }
 }

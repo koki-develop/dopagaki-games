@@ -14,7 +14,7 @@ const fileAt = (path: string) => {
 
 describe('generateSite', () => {
   test('ページごとの HTML と 404 の HTML を、本番のパスに対応する名前で作る', () => {
-    expect(site.pages.map((p) => p.fileName)).toEqual(['index.html', 'breakout.html', '404.html']);
+    expect(site.pages.map((p) => p.fileName)).toEqual(['index.html', 'breakout.html', 'reversi.html', '404.html']);
     expect(site.pages.map((p) => p.doc.route)).toEqual([...PAGES.map((p) => p.id), 'notFound']);
   });
 
