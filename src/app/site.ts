@@ -4,11 +4,11 @@
  */
 
 /** 本番の配信元。canonical・og:url・og:image・sitemap は、開発中もこの絶対 URL で書く */
-export const SITE_ORIGIN = 'https://dopagaki.games';
+const SITE_ORIGIN = 'https://dopagaki.games';
 export const SITE_NAME = 'DOPAGAKI GAMES';
 export const SITE_LOCALE = 'ja_JP';
 
-export type PageMeta = {
+type PageMeta = {
   /** パス。先頭は /、末尾に / を付けない（ポータルの / を除く） */
   readonly path: string;
   /** ページ固有の名前。og:title にはこれをそのまま使い、サイト名は og:site_name で別に渡す */
@@ -40,8 +40,12 @@ export type PageId = (typeof PAGES)[number]['id'];
 /** 表示する画面。どのページのパスにも当たらなければ notFound */
 export type Route = PageId | 'notFound';
 
-/** どのパスにも当たらないときの表示。サーバーはこの画面をステータス 404 で返す */
-export const NOT_FOUND_TITLE = 'ページが見つかりません';
+/**
+ * どのパスにも当たらないときの画面の題名を、折り返してよい位置で区切ったもの。サーバーはこの画面をステータス 404 で返す。
+ * 画面の見出しは区切りに <wbr> を置き、タブの題名はつなげて使う
+ */
+export const NOT_FOUND_TITLE_PARTS = ['ページが', '見つかりません'] as const;
+const NOT_FOUND_TITLE = NOT_FOUND_TITLE_PARTS.join('');
 
 export function pageOf(id: PageId): PageMeta {
   const page = PAGES.find((p) => p.id === id);
@@ -56,6 +60,9 @@ export function pageOf(id: PageId): PageMeta {
 export function parseRoute(pathname: string): Route {
   return PAGES.find((p) => p.path === pathname)?.id ?? 'notFound';
 }
+
+/** ゲームの画面か。ゲームの画面ではスクロールや長押しのメニューを止める（<html> の data-game） */
+export const isGameRoute = (route: Route): boolean => GAMES.some((g) => g.id === route);
 
 /** ブラウザのタブや検索結果に出す題名。ポータルはサイト名だけ、ほかは「ページ名 | サイト名」 */
 export function documentTitle(id: Route): string {

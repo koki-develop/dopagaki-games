@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'bun:test';
+import { neonRgb } from '../../../engine/neon.ts';
+import { ParticleShape } from '../../../engine/particle-spec.ts';
+import type { ParticleSpec } from '../../../engine/particle-spec.ts';
 import { BlockType, FIELD_H } from '../config.ts';
-import { blockHue, HARD_MIX, HARD_RGB, neonRgb, SOLID_RGB } from '../view/palette.ts';
+import { blockHue, HARD_MIX, HARD_RGB, SOLID_RGB } from '../view/palette.ts';
+import type { DebrisSpec } from './debris-spec.ts';
 import { ParticleFx } from './particle-fx.ts';
-import { ParticleShape } from './particle-shape.ts';
-import type { DebrisSpec, ParticleSpec } from './particle-shape.ts';
 import { CountingSink } from './test-kit.test-support.ts';
 
 function make() {

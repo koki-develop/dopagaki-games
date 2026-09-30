@@ -14,7 +14,7 @@ const rasterize = (svg: string, size: number): Promise<Buffer> =>
     .toBuffer();
 
 /** アイコンのファイル。パスはサイトのルートから。index.html の <link> がこのパスを指す */
-export type IconFile = { readonly path: string; readonly contentType: string; readonly body: Buffer };
+type IconFile = { readonly path: string; readonly contentType: string; readonly body: Buffer };
 
 /**
  * ブラウザのタブには SVG を、SVG を読めない場面（Google 検索の favicon など）には PNG を、

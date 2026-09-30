@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { absoluteUrl, documentTitle, PAGES, parseRoute, SITE_NAME } from './site.ts';
+import { absoluteUrl, documentTitle, GAMES, isGameRoute, PAGES, parseRoute, SITE_NAME } from './site.ts';
 
 describe('PAGES', () => {
   test('パスは / で始まり、末尾に / を付けず、重ならない', () => {
@@ -39,6 +39,14 @@ describe('documentTitle', () => {
     expect(documentTitle('portal')).toBe(SITE_NAME);
     expect(documentTitle('breakout')).toBe(`ブロック崩し | ${SITE_NAME}`);
     expect(documentTitle('notFound')).toBe(`ページが見つかりません | ${SITE_NAME}`);
+  });
+});
+
+describe('isGameRoute', () => {
+  test('ゲームのページだけが真', () => {
+    for (const g of GAMES) expect(isGameRoute(g.id)).toBe(true);
+    expect(isGameRoute('portal')).toBe(false);
+    expect(isGameRoute('notFound')).toBe(false);
   });
 });
 

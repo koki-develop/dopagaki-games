@@ -26,8 +26,8 @@ describe('全消し', () => {
 
   test('カメラの引きは揺れの一部で、画面の揺れをオフにした倍率では引かない', () => {
     const h = new Harness({ sim: allClearSim() });
-    const shakeOn = { shake: 1, pulse: 1, pull: 1, punch: 1 };
-    const shakeOff = { shake: 0, pulse: 0, pull: 1, punch: 0 };
+    const shakeOn = { shake: 1, pulse: 1, pull: 1, punch: 1, jolt: 1 };
+    const shakeOff = { shake: 0, pulse: 0, pull: 1, punch: 0, jolt: 0 };
     const view = { x: 0, y: 0, rotation: 0, zoom: 0 };
     toAllClear(h);
     let minZoom = 1;

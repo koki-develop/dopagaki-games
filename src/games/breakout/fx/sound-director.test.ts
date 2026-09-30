@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import type { FrameTime } from '../frame-time.ts';
+import type { FrameTime } from '../../../juice/frame-time.ts';
 import { FrameSummary } from './aggregate.ts';
 import { IntensityMeter } from './intensity.ts';
 import { BREAK_MIN_INTERVAL, SoundDirector } from './sound-director.ts';

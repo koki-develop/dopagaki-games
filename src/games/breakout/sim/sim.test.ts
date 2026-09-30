@@ -18,6 +18,7 @@ import {
 } from '../config.ts';
 import type { Tuning } from '../config.ts';
 import { BlockField, cellCenterX, cellLeft, colAtX } from './blocks.ts';
+import type { ReadonlyBlockField } from './blocks.ts';
 import { EventKind, Signal } from './events.ts';
 import { Sim, paddleRange } from './sim.ts';
 import {
@@ -80,6 +81,12 @@ function gameOverWhileAttached(): Sim {
 
 const degOf = (dx: number, dy: number) => Math.atan2(dy, dx) / DEG;
 
+/** y 座標が含まれる行番号。格子の外なら -1 */
+function rowAt(f: ReadonlyBlockField, y: number): number {
+  const row = Math.floor((y - f.lowestRowY) / CELL_H);
+  return row >= 0 && row < f.rowCount ? row : -1;
+}
+
 function assertBallInvariants(sim: Sim): void {
   const b = sim.balls;
   const minSin = Math.sin(sim.config.ball.minDegFromHorizontal * DEG);
@@ -97,7 +104,7 @@ function assertNoBallInsideBlocks(sim: Sim): void {
   const b = sim.balls;
   const f = sim.blocks;
   for (let i = 0; i < b.count; i++) {
-    const row = f.rowAtY(b.y[i]);
+    const row = rowAt(f, b.y[i]);
     const col = colAtX(b.x[i]);
     if (row < 0 || col < 0 || col >= COLS) continue;
     const idx = f.slotOf(row) * COLS + col;
@@ -157,8 +164,8 @@ describe('発射', () => {
   test('パドルの目標は壁の内側（paddleRange）に収める', () => {
     const sim = makeSim(ENDLESS);
     const range = paddleRange(sim.config);
-    expect(range.min).toBe(sim.paddleWidth / 2);
-    expect(range.max).toBe(FIELD_W - sim.paddleWidth / 2);
+    expect(range.min).toBe(sim.config.paddle.width / 2);
+    expect(range.max).toBe(FIELD_W - sim.config.paddle.width / 2);
     sim.step({ paddleTargetX: -100, launch: false });
     expect(sim.paddleX).toBe(range.min);
     sim.step({ paddleTargetX: 100, launch: false });
@@ -1201,7 +1208,7 @@ describe('開発用のボールの追加', () => {
     expect(sim.balls.count).toBeLessThanOrEqual(200);
     assertBallInvariants(sim);
     for (let i = 0; i < sim.balls.count; i++) {
-      const row = f.rowAtY(sim.balls.y[i]);
+      const row = rowAt(f, sim.balls.y[i]);
       const col = colAtX(sim.balls.x[i]);
       if (row < 0 || col < 0 || col >= COLS) continue;
       const idx = f.slotOf(row) * COLS + col;

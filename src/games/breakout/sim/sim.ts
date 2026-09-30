@@ -1,4 +1,5 @@
 import { clamp, lerp, ramp } from '../../../shared/math.ts';
+import { Rng } from '../../../shared/rng.ts';
 import {
   BALL_CAP,
   BALL_RADIUS,
@@ -23,7 +24,6 @@ import type { BlockHitHandler } from './collide.ts';
 import { Descent, descentRateAt } from './descent.ts';
 import { EndlessRows } from './endless-rows.ts';
 import { EventKind, EventQueue, Signal } from './events.ts';
-import { Rng } from './rng.ts';
 import { Scoring } from './scoring.ts';
 import { parseStage } from './stage-parse.ts';
 import type { StageDef } from './stage-parse.ts';
@@ -33,7 +33,7 @@ export type SimMode = { kind: 'endless' } | { kind: 'stage'; stage: StageDef };
 /** 1 ステップぶんの入力。paddleTargetX が有限でなければ、パドルの目標は前のまま */
 export type SimInput = { paddleTargetX: number; launch: boolean };
 
-export type Phase = 'playing' | 'over' | 'cleared';
+type Phase = 'playing' | 'over' | 'cleared';
 
 type SimOptions = { mode: SimMode; seed: number; config: SimConfig };
 
@@ -87,6 +87,7 @@ export class Sim {
 
   private _phase: Phase = 'playing';
   private _time = 0;
+  /** ボールが飛んでいた時間の合計。難易度の進行に使う */
   private _activeTime = 0;
   private _speed: number;
   private _attached = true;
@@ -155,11 +156,6 @@ export class Sim {
     return this._time;
   }
 
-  /** ボールが飛んでいた時間の合計。難易度の進行に使う */
-  get activeTime(): number {
-    return this._activeTime;
-  }
-
   /** 全ボール共通の速さ（u/s） */
   get speed(): number {
     return this._speed;
@@ -167,10 +163,6 @@ export class Sim {
 
   get paddleX(): number {
     return this._paddleX;
-  }
-
-  get paddleWidth(): number {
-    return this.config.paddle.width;
   }
 
   /** ボールがパドルに乗って発射を待っている */

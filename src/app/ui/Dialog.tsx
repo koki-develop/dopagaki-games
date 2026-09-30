@@ -28,14 +28,18 @@ const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), [tabin
  */
 export default function Dialog({ title, message, role = 'dialog', layer = 'modal', hidden, children }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
+  /** 閉じたときのフォーカスの戻り先。開いたときに 1 度だけ覚える */
+  const openerRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
   const messageId = useId();
 
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
-    // 背後を inert にする前に、戻り先を覚えておく（inert になった要素からはフォーカスが外れるため）
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // 背後を inert にする前に、戻り先を覚えておく（inert になった要素からはフォーカスが外れるため）。
+    // 開発時の StrictMode では、この処理が片付けを挟んで 2 回走る。2 回目はフォーカスがもうダイアログの中にあるので、覚え直さない
+    const active = document.activeElement;
+    if (!openerRef.current && active instanceof HTMLElement && !root.contains(active)) openerRef.current = active;
     const inerted: HTMLElement[] = [];
     for (const el of Array.from(root.parentElement?.children ?? [])) {
       if (el === root || !(el instanceof HTMLElement) || el.inert) continue;
@@ -47,8 +51,10 @@ export default function Dialog({ title, message, role = 'dialog', layer = 'modal
     return () => {
       for (const el of inerted) el.inert = false;
       // 閉じると同時に書き換わる周りの DOM（隠していたメニューの再表示など）が反映されてから戻す
+      // 戻り先がまだ inert の中にあるとき（開き直した直後や、ほかのダイアログが開いているとき）は戻さない
       queueMicrotask(() => {
-        if (opener?.isConnected && !opener.inert) opener.focus({ preventScroll: true });
+        const opener = openerRef.current;
+        if (opener?.isConnected && !opener.closest('[inert]')) opener.focus({ preventScroll: true });
       });
     };
   }, []);

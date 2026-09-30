@@ -81,8 +81,8 @@ export function summarize(ev: EventQueue, budget: number, out: FrameSummary): Fr
   const breaks = ev.counts[EventKind.BlockBreak];
   const breakLimit = Math.ceil(MAX_BREAK_FX * b);
   const debrisLimit = Math.ceil(MAX_DEBRIS_FX * b);
-  const hardLimit = MAX_HARD_FX * b;
-  const solidLimit = MAX_SOLID_FX * b;
+  const hardLimit = Math.ceil(MAX_HARD_FX * b);
+  const solidLimit = Math.ceil(MAX_SOLID_FX * b);
   const breakStride = breaks > breakLimit ? breaks / breakLimit : 1;
 
   out.breaks = breaks;

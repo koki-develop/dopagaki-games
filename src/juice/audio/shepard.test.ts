@@ -4,6 +4,7 @@ import type { MockPeriodicWave } from './mock-audio.test-support.ts';
 import {
   octavePosition,
   PENTATONIC,
+  pentatonicSemitones,
   SHEPARD_HARMONICS,
   shepardAnchor,
   shepardWaveCoefficients,
@@ -143,5 +144,20 @@ describe('Shepard tone の PeriodicWave', () => {
 
     const other = new MockAudioContext();
     expect(shepardWaves(other.asContext(), COMPONENTS)).not.toBe(bank);
+  });
+});
+
+describe('Shepard tone', () => {
+  test('ペンタトニックは 5 音で 1 オクターブ上がる', () => {
+    expect([0, 1, 2, 3, 4, 5, 6].map(pentatonicSemitones)).toEqual([0, 2, 4, 7, 9, 12, 14]);
+  });
+
+  test('12 半音上がると成分の組み合わせが元に戻る（無限に上がって聞こえる）', () => {
+    const parts = (semitones: number) => {
+      const h = octavePosition(semitones) / 12;
+      return [0, 1, 2, 3].map((k) => ({ freq: 100 * 2 ** (k + h), amp: shepardWeight(k, h, 4) }));
+    };
+    expect(parts(15)).toEqual(parts(3));
+    expect(parts(-9)).toEqual(parts(3));
   });
 });

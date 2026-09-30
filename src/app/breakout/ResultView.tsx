@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useId } from 'react';
 import type { CSSProperties } from 'react';
-import { RESULT_REVEAL } from '../../games/breakout/controller.ts';
 import type { RunResult } from '../../games/breakout/types.ts';
-import { formatScore } from '../../games/breakout/hud/format.ts';
+import { formatScore } from '../../shared/format.ts';
 import { STAGES } from '../../games/breakout/stages/stages.ts';
-import { clamp01 } from '../../shared/math.ts';
+import { useCountUp } from '../game/useCountUp.ts';
 import Overlay from '../ui/Overlay.tsx';
-import { useReducedMotion } from '../useSettings.ts';
+import { RESULT_REVEAL } from './reveal.ts';
 
 type Props = {
   result: RunResult;
@@ -23,40 +22,30 @@ const REVEAL_STYLE = {
   '--result-newbest-delay': `${RESULT_REVEAL.newBestAtMs}ms`,
 } as CSSProperties;
 
-/** 数字を 0 から目標までカウントアップする。動きを減らす設定のときは、最初から目標を出す */
-function useCountUp(target: number, delayMs: number, durationMs: number, reduced: boolean): number {
-  const [v, setV] = useState(0);
-  useEffect(() => {
-    const start = performance.now() + (reduced ? 0 : delayMs);
-    let raf = 0;
-    const tick = (now: number) => {
-      const t = reduced ? 1 : clamp01((now - start) / durationMs);
-      // 最後にゆっくり止まる
-      const e = 1 - (1 - t) ** 4;
-      setV(Math.round(target * e));
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target, delayMs, durationMs, reduced]);
-  return v;
-}
-
 export default function ResultView({ result, onRetry, onNext, onTitle }: Props) {
   const { mode } = result;
   const cleared = mode.kind === 'stage' && result.cleared;
-  const shownTotal = useCountUp(result.score, RESULT_REVEAL.settleMs, RESULT_REVEAL.countUpMs, useReducedMotion());
+  const headingId = useId();
+  const summaryId = useId();
+  const shownTotal = useCountUp(result.score, RESULT_REVEAL.settleMs, RESULT_REVEAL.countUpMs);
   const stage = mode.kind === 'stage' ? STAGES[mode.index] : undefined;
 
   return (
-    <Overlay data-cleared={cleared} style={REVEAL_STYLE}>
-      <h1 className="result-heading">{cleared ? 'STAGE CLEAR' : 'GAME OVER'}</h1>
+    <Overlay role="dialog" aria-labelledby={headingId} aria-describedby={summaryId} data-cleared={cleared} style={REVEAL_STYLE}>
+      <h1 id={headingId} className="result-heading">
+        {cleared ? 'STAGE CLEAR' : 'GAME OVER'}
+      </h1>
       {mode.kind === 'stage' && (
         <p className="result-stage">
           STAGE {mode.index + 1}
           {stage && ` — ${stage.name}`}
         </p>
       )}
+      {/* スコアはカウントアップの途中を読まないよう、確定した値をまとめて読み上げる */}
+      <p id={summaryId} className="visually-hidden">
+        {mode.kind === 'stage' && `STAGE ${mode.index + 1}。`}
+        スコア {formatScore(result.score)}。{result.newBest ? '最高スコアを更新しました。' : `ベスト ${formatScore(result.previousBest)}。`}
+      </p>
 
       <div className="result-score">
         <span className="result-label">SCORE</span>

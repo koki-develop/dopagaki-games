@@ -105,6 +105,19 @@ describe('Finale の段階', () => {
     expect(h.director.skip()).toBe(false);
   });
 
+  test('溜めの途中で飛ばすと、吸い込む音をその場で止める。炸裂の後に飛ばしたときは止めるものがない', () => {
+    const held = new Harness({ sim: clearingSim(10) });
+    held.until(() => held.ended && held.rec.count('sfx.inhale') > 0, 600);
+    expect(held.rec.count('sfx.inhale.stop')).toBe(0);
+    expect(held.director.skip()).toBe(true);
+    expect(held.rec.count('sfx.inhale.stop')).toBe(1);
+
+    const burst = new Harness({ sim: clearingSim(10) });
+    toBurst(burst);
+    expect(burst.director.skip()).toBe(true);
+    expect(burst.rec.count('sfx.inhale.stop')).toBe(0);
+  });
+
   test('溜めの途中で飛ばすと、縁の絞り込みと吸い込みは飛ばしたときの値から 0.35 秒（実時間）でほどける', () => {
     const h = new Harness({ sim: clearingSim(10) });
     h.until(() => h.ended, 600);

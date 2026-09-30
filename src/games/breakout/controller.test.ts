@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { createControllerStore, createPortRelay, hasNextStage, RESULT_INPUT_GUARD_MS, RESULT_REVEAL, transition } from './controller.ts';
+import { createControllerStore, hasNextStage, RESULT_INPUT_GUARD_MS, transition } from './controller.ts';
 import type { Command, ControllerContext, ControllerEvent, Phase } from './controller.ts';
 import { createRecordsStore } from './records.ts';
 import type { GamePort, RunMode, RunResult } from './types.ts';
@@ -365,27 +365,5 @@ describe('createControllerStore', () => {
     expect(store.getSnapshot().k).toBe('ending');
     store.dispatch({ t: 'finished', result: res(ENDLESS, false, 5) });
     expect(store.getSnapshot().k).toBe('result');
-  });
-});
-
-describe('RESULT_REVEAL', () => {
-  test('操作を受け付け始めるのは、見出しが着地した後で、演出が終わる前', () => {
-    expect(RESULT_INPUT_GUARD_MS).toBe(RESULT_REVEAL.settleMs);
-    expect(RESULT_REVEAL.settleMs).toBeGreaterThanOrEqual(RESULT_REVEAL.headingMs * 0.6);
-    expect(RESULT_REVEAL.settleMs).toBeLessThan(RESULT_REVEAL.headingMs);
-  });
-});
-
-describe('createPortRelay', () => {
-  test('結びつけたゲームへ命令を渡し、結びつける前と外した後は捨てる', () => {
-    const relay = createPortRelay();
-    const port = fakePort();
-    relay.begin();
-    relay.bind(port);
-    relay.prepare(S1, 3);
-    relay.setPaused(true);
-    relay.bind(null);
-    relay.endRun();
-    expect(port.calls).toEqual(['prepare 1 3', 'setPaused true']);
   });
 });

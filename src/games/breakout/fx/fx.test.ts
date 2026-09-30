@@ -28,7 +28,6 @@ describe('IntensityMeter', () => {
   test('破壊が続くと上がり、止まると下がる。0〜1 に収まる', () => {
     const m = new IntensityMeter();
     for (let i = 0; i < 120; i++) m.update(5, 100, 1 / 60);
-    expect(m.rate).toBeGreaterThan(250);
     expect(m.intensity).toBeGreaterThan(0.8);
     expect(m.intensity).toBeLessThanOrEqual(1);
     for (let i = 0; i < 180; i++) m.update(0, 0, 1 / 60);
@@ -39,9 +38,10 @@ describe('IntensityMeter', () => {
     const a = new IntensityMeter();
     const b = new IntensityMeter();
     for (let i = 0; i < 240; i++) a.update(1, 0, 1 / 120);
-    for (let i = 0; i < 60; i++) b.update(2, 0, 1 / 30);
-    expect(a.rate).toBeCloseTo(120, 0);
-    expect(b.rate).toBeGreaterThan(55);
-    expect(b.rate).toBeLessThan(75);
+    for (let i = 0; i < 60; i++) b.update(4, 0, 1 / 30);
+    // 1 秒に 120 個の破壊は、log スケールで 0.75 × log(1 + 120) / log(1 + 250)
+    const expected = (0.75 * Math.log1p(120)) / Math.log1p(250);
+    expect(a.intensity).toBeCloseTo(expected, 2);
+    expect(b.intensity).toBeCloseTo(expected, 1);
   });
 });

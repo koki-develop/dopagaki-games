@@ -1,11 +1,12 @@
 import { FixedStepper, MAX_FRAME_DT } from '../../engine/frame-loop.ts';
+import type { LayeredBgm } from '../../juice/audio/bgm.ts';
 import type { AudioEngine, VoiceGroup } from '../../juice/audio/engine.ts';
 import { CameraRig } from '../../juice/camera.ts';
 import type { FlashLimiter } from '../../juice/flash.ts';
+import type { FrameTime } from '../../juice/frame-time.ts';
 import { WorldClock } from '../../juice/time.ts';
 import { STEP_DT } from './config.ts';
 import type { SimConfig } from './config.ts';
-import type { FrameTime } from './frame-time.ts';
 import { Director } from './fx/director.ts';
 import type { DirectorOutcome, DirectorPorts } from './fx/director.ts';
 import { createFxState } from './fx/fx-state.ts';
@@ -14,7 +15,6 @@ import { PaddleInput } from './paddle-input.ts';
 import { paddleRange, Sim } from './sim/sim.ts';
 import type { SimInput } from './sim/sim.ts';
 import type { StageDef } from './sim/stage-parse.ts';
-import type { Bgm } from './sounds/bgm.ts';
 import { BreakoutSfx } from './sounds/sfx.ts';
 import type { HudState, RunMode, RunResult } from './types.ts';
 import type { SceneSource } from './view/scene.ts';
@@ -27,7 +27,7 @@ const DISPOSE_FADE = 0.05;
 /** セッションが持ち、プレイをまたいで使い回すもの */
 export type RunServices = {
   audio: AudioEngine;
-  bgm: Bgm;
+  bgm: LayeredBgm;
   flashes: FlashLimiter;
   particles: DirectorPorts['particles'];
   debris: DirectorPorts['debris'];

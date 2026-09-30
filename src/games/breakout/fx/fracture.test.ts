@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { Rng } from '../sim/rng.ts';
+import { Rng } from '../../../shared/rng.ts';
 import { Fracture, fractureRect, MAX_PIECE_VERTS, MAX_PIECES, MIN_PIECES, pieceMass, rayToRect } from './fracture.ts';
 import type { PieceMass } from './fracture.ts';
 

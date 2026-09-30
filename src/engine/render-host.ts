@@ -13,6 +13,8 @@ type RenderHostOptions = {
   onLost: () => void;
   /** 描画バッファの大きさが変わった（CSS の大きさ、devicePixelRatio、pixelRatio の上限のどれかが変わった） */
   onResize?: () => void;
+  /** レンダラーを作る。省略すると WebGPURenderer */
+  createRenderer?: (params: THREE.WebGPURendererParameters) => THREE.WebGPURenderer;
 };
 
 /**
@@ -23,7 +25,8 @@ type RenderHostOptions = {
  * - ライトは使わない（renderer.lighting を切る）
  * - 描画バッファの大きさは CSS の大きさ × min(devicePixelRatio, pixelRatio の上限)。
  *   devicePixelRatio の変化（ブラウザのズーム、別の画面への移動）も matchMedia で拾う
- * - GPU を失ったら onLost を呼び、以後の描画はしない。呼び出し側でこの RenderHost を捨てて作り直す。
+ * - GPU を失ったら onLost を呼び、以後の描画はしない。three.js の既定の処理（レンダラーに失ったことを覚えさせ、
+ *   描画とコンパイルを止める）もそのまま呼ぶ。呼び出し側でこの RenderHost を捨てて作り直す。
  *   シーンのオブジェクトはそのまま使い回せる
  */
 export class RenderHost {
@@ -49,7 +52,7 @@ export class RenderHost {
   }
 
   static async create(opts: RenderHostOptions): Promise<RenderHost> {
-    const renderer = new THREE.WebGPURenderer({
+    const renderer = (opts.createRenderer ?? ((p) => new THREE.WebGPURenderer(p)))({
       antialias: false,
       alpha: false,
       depth: false,
@@ -63,14 +66,12 @@ export class RenderHost {
     // ライトは使わない（すべてのマテリアルが色を自分で決める）。切っておくと、描画のたびに作る環境のキャッシュキー
     // （ライト・環境マップ・影の設定）を組み立てなくなる
     renderer.lighting.enabled = false;
-    try {
-      await renderer.init();
-    } catch (e) {
-      renderer.dispose();
-      throw e;
-    }
+    // 初期化に失敗したレンダラーは GPU の資源を持たない。dispose() は失敗した初期化をもう一度待って投げ直すので呼ばない
+    await renderer.init();
     const host = new RenderHost(renderer, opts.onResize);
-    renderer.onDeviceLost = () => {
+    const markLost = renderer.onDeviceLost.bind(renderer);
+    renderer.onDeviceLost = (info) => {
+      markLost(info);
       if (host.disposed || host.lostFlag) return;
       host.lostFlag = true;
       opts.onLost();
@@ -122,7 +123,7 @@ export class RenderHost {
     }
   }
 
-  /** 毎フレーム呼ぶ関数を登録する（null で止める）。time は rAF のタイムスタンプ（ms）。最初の 1 回は渡されない */
+  /** 毎フレーム呼ぶ関数を登録する（null で止める）。time は rAF のタイムスタンプ（ms） */
   setAnimationLoop(cb: ((time?: number) => void) | null): void {
     void this.renderer.setAnimationLoop(cb);
   }
@@ -133,7 +134,7 @@ export class RenderHost {
     this.dprQuery?.removeEventListener('change', this.onDprChange);
     this.dprQuery = null;
     void this.renderer.setAnimationLoop(null);
-    this.renderer.dispose();
+    void this.renderer.dispose();
     this.canvas.remove();
   }
 

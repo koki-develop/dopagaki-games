@@ -1,12 +1,12 @@
 import type { CameraRig } from '../../../juice/camera.ts';
+import type { FrameTime } from '../../../juice/frame-time.ts';
 import { clamp01, damp } from '../../../shared/math.ts';
 import { DANGER_Y } from '../config.ts';
-import type { FrameTime } from '../frame-time.ts';
 import type { Sim } from '../sim/sim.ts';
 import { LOOK } from '../view/look.ts';
 import type { FxState } from './fx-state.ts';
 
-/** 演出から動かす BGM のつまみ。Bgm がそのまま当てはまり、値が変わらない呼び出しは Bgm の側で無視する */
+/** 演出から動かす BGM のつまみ。LayeredBgm がそのまま当てはまり、値が変わらない呼び出しは LayeredBgm の側で無視する */
 export type BgmPort = {
   setTier(tier: number): void;
   setRiser(level: number): void;

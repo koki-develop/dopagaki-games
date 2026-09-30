@@ -66,16 +66,6 @@ export class Descent {
     return this.major && this.majorRefill;
   }
 
-  /** 1 段の降下を待っている量 */
-  get backlog(): number {
-    return this.progress;
-  }
-
-  /** 進行中の 1 段の降下の数 */
-  get activeStepDrops(): number {
-    return this.slotCount;
-  }
-
   /**
    * dt 秒進める。rows は降下速度 × dt（溜まる量）。stepRow は 1 段の距離、stepSeconds は 1 段の落下時間。
    * 返す値は使い回すので、次に呼ぶまでに読む。

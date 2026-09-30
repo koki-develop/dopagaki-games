@@ -1,8 +1,8 @@
 import { ramp } from '../../../shared/math.ts';
+import type { Rng } from '../../../shared/rng.ts';
 import { BlockType, COLS } from '../config.ts';
 import type { SimConfig } from '../config.ts';
 import type { BlockField } from './blocks.ts';
-import type { Rng } from './rng.ts';
 
 
 /** [min, max] の整数を一様に選ぶ */

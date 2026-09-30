@@ -1,7 +1,8 @@
 /** シーケンサーが読む時計。AudioEngine がこの形を満たす */
 export type SequencerClock = {
-  /** 秒。running の間は AudioContext の時刻、それ以外は実時間 */
+  /** 秒。running の間は AudioContext の時刻 */
   now(): number;
+  /** 音を鳴らせるか（AudioContext が動いているか） */
   readonly running: boolean;
   /** 予約した時刻から、実際に聞こえるまでの遅れ（秒） */
   latency(): number;
@@ -21,9 +22,9 @@ const defaultTimer: IntervalTimer = {
 /** どこまで先の音を予約しておくか（秒） */
 const LOOKAHEAD = 0.12;
 const INTERVAL_MS = 25;
-/** 鳴らし始め（時計が切り替わったとき）に、最初のステップを置く先の時刻（秒） */
+/** 鳴らし始めに、最初のステップを置く先の時刻（秒） */
 const START_LEAD = 0.06;
-/** 止めた位置から再開するとき、最初のステップまでに最低限あける時間（秒） */
+/** 止めた位置から続けるとき、最初のステップまでに最低限あける時間（秒） */
 const MIN_LEAD = 0.03;
 /** これより長く予約が遅れたら、溜まったステップを飛ばして現在から数え直す（秒） */
 const MAX_GAP = 0.25;
@@ -35,6 +36,8 @@ const MAX_GAP = 0.25;
  *
  * - 予約の時刻がすでに過ぎたステップは鳴らさずに飛ばす。タイマーが遅れても、溜まった音をまとめて鳴らさない
  * - 止めて再開すると、止めたステップから同じ間合いで続ける。beatPosition() は止めている間は止まり、再開後もつながる
+ * - 時計が動いていない（AudioContext が止まっている）間は、ステップを進めずに待ち、動き出したらそのステップから続ける。
+ *   鳴らせないまま曲の頭を読み飛ばさないように。beatPosition() も待っている間は止まる
  */
 export class Sequencer {
   readonly bpm: number;
@@ -43,12 +46,18 @@ export class Sequencer {
   private readonly onStep: (step: number, time: number) => void;
   private readonly timer: IntervalTimer;
   private timerId: unknown = null;
+  /** 鳴らしているが、時計が動くのを待っている */
+  private waiting = false;
+  /**
+   * 鳴らしている途中で時計が止まって待っている。AudioContext の時刻は止まっている間は進まず、
+   * 予約済みの音は動き出してから元の時刻に鳴るので、動き出したら同じ時間軸のまま続ける
+   */
+  private frozen = false;
   private nextStep = 0;
   private nextTime = 0;
   /** step 0 の時刻 */
   private origin = 0;
-  private usingCtxClock = false;
-  /** 止めている間の、次のステップまでの残り時間（秒）。再開するときにこの間合いを保つ */
+  /** 止めている（待っている）間の、次のステップまでの残り時間（秒）。続けるときにこの間合いを保つ */
   private pendingLead = START_LEAD;
 
   constructor(
@@ -73,14 +82,10 @@ export class Sequencer {
     return this.timerId !== null;
   }
 
-  /** 次に予約されるステップの番号 */
-  get upcomingStep(): number {
-    return this.nextStep;
-  }
-
   start(): void {
     if (this.playing) return;
-    this.anchor(Math.min(LOOKAHEAD + this.stepDuration, Math.max(MIN_LEAD, this.pendingLead)));
+    this.waiting = true;
+    this.frozen = false;
     this.timerId = this.timer.set(this.tick, INTERVAL_MS);
     this.tick();
   }
@@ -89,34 +94,53 @@ export class Sequencer {
     if (!this.playing) return;
     this.timer.clear(this.timerId);
     this.timerId = null;
-    this.pendingLead = Math.max(0, this.nextTime - this.clock.now());
+    this.hold();
+    this.frozen = false;
   }
 
   /** ステップ 0 へ戻す。鳴らしている間なら、今からステップ 0 を鳴らし始める */
   reset(): void {
     this.nextStep = 0;
     this.pendingLead = START_LEAD;
-    if (this.playing) this.anchor(START_LEAD);
+    this.frozen = false;
+    if (this.playing && !this.waiting) this.anchor(START_LEAD);
   }
 
   /** 実際に聞こえている位置（拍単位）。ビートに合わせた映像に使う */
   beatPosition(): number {
     const beat = 60 / this.bpm;
     const latency = this.clock.latency();
-    if (!this.playing) return (this.nextStep * this.stepDuration - this.pendingLead - latency) / beat;
+    if (!this.playing || this.waiting) return (this.nextStep * this.stepDuration - this.pendingLead - latency) / beat;
     return (this.clock.now() - latency - this.origin) / beat;
   }
 
+  /** 進めるのをやめ、次のステップまでの間合いを覚えておく */
+  private hold(): void {
+    if (this.waiting) return;
+    this.waiting = true;
+    this.pendingLead = Math.max(0, this.nextTime - this.clock.now());
+  }
+
   private anchor(lead: number): void {
-    this.usingCtxClock = this.clock.running;
     this.nextTime = this.clock.now() + lead;
     this.origin = this.nextTime - this.nextStep * this.stepDuration;
   }
 
   private readonly tick = (): void => {
-    // AudioContext が動き出したり止まったりしたら、時刻の基準が変わるので予約位置を付け直す
-    if (this.clock.running !== this.usingCtxClock) this.anchor(START_LEAD);
+    if (!this.clock.running) {
+      if (!this.waiting) {
+        this.hold();
+        this.frozen = true;
+      }
+      return;
+    }
     const now = this.clock.now();
+    if (this.waiting) {
+      this.waiting = false;
+      const keep = this.frozen && this.nextTime >= now + MIN_LEAD;
+      this.frozen = false;
+      if (!keep) this.anchor(Math.min(LOOKAHEAD + this.stepDuration, Math.max(MIN_LEAD, this.pendingLead)));
+    }
     // 長く止まっていた（タブが隠れていた等）ときは、溜まったステップを数えずに現在へ飛ぶ
     if (this.nextTime < now - MAX_GAP) this.anchor(START_LEAD);
     const step = this.stepDuration;

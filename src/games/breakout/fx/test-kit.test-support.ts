@@ -2,12 +2,13 @@
  * 演出のテストの道具。本物の Sim・WorldClock・CameraRig・FlashLimiter を使い、音・粒・振動は呼ばれた内容を記録する代役にする。
  * セッションと同じ順序（イベントを消す → 固定ステップを進める → 演出）で 1 フレームずつ進める。
  */
+import type { SilenceHandle } from '../../../juice/audio/engine.ts';
 import { CameraRig } from '../../../juice/camera.ts';
 import { FlashLimiter } from '../../../juice/flash.ts';
+import type { FrameTime } from '../../../juice/frame-time.ts';
 import { WorldClock } from '../../../juice/time.ts';
 import { BlockType, STEP_DT } from '../config.ts';
 import type { Tuning } from '../config.ts';
-import type { FrameTime } from '../frame-time.ts';
 import { cellCenterX } from '../sim/blocks.ts';
 import { Sim } from '../sim/sim.ts';
 import {
@@ -27,7 +28,8 @@ import type { DirectorOutcome, DirectorPorts } from './director.ts';
 import type { FinaleAudio } from './finale.ts';
 import { createFxState } from './fx-state.ts';
 import type { FxState } from './fx-state.ts';
-import type { DebrisSpec, ParticleSpec } from './particle-shape.ts';
+import type { ParticleSpec } from '../../../engine/particle-spec.ts';
+import type { DebrisSpec } from './debris-spec.ts';
 import type { SfxPort } from './sound-director.ts';
 
 type Call = { name: string; args: unknown[] };
@@ -78,9 +80,14 @@ export class Recorder {
   }
 }
 
+/** 効果音の代役。途中で止められる音（inhale）は、止めたことも `sfx.<名前>.stop` として記録する口を返す */
 export function recordingSfx(rec: Recorder): SfxPort {
-  const sfx = {} as Record<string, (...args: unknown[]) => void>;
+  const sfx = {} as Record<string, (...args: unknown[]) => unknown>;
   for (const m of SFX_METHODS) sfx[m] = (...args: unknown[]) => rec.record(`sfx.${m}`, args);
+  sfx.inhale = (...args: unknown[]) => {
+    rec.record('sfx.inhale', args);
+    return { stop: () => rec.record('sfx.inhale.stop', []) };
+  };
   return sfx as unknown as SfxPort;
 }
 
@@ -110,7 +117,7 @@ class FakeAudio implements FinaleAudio {
     return this.time;
   }
 
-  silence(duration: number, fadeIn?: number): { cancel(): void } {
+  silence(duration: number, fadeIn?: number): SilenceHandle {
     this.rec.record('audio.silence', [duration, fadeIn]);
     return { cancel: () => this.rec.record('audio.silence.cancel', []) };
   }
@@ -118,7 +125,7 @@ class FakeAudio implements FinaleAudio {
 
 /** 粒や破片を受け取り、数と、渡された発生条件のオブジェクトの種類を数える */
 /** 奈落に落ちたボールとして渡されたもの */
-export type FallenBall = { at: number; x: number; y: number; vx: number; vy: number };
+type FallenBall = { at: number; x: number; y: number; vx: number; vy: number };
 
 export class CountingSink<T extends object> {
   count = 0;

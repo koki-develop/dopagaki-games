@@ -1,13 +1,15 @@
 import { describe, expect, test } from 'bun:test';
+import { float, Fn } from 'three/tsl';
 import type * as THREE from 'three/webgpu';
 import type { CameraOffset } from '../../../juice/camera.ts';
-import type { FrameTime } from '../frame-time.ts';
+import type { FrameTime } from '../../../juice/frame-time.ts';
 import { createFxState, PRESENT_LONG_AGO, SHOCK_SPEED_IDLE, WALL_HIT_SLOTS } from '../fx/fx-state.ts';
 import type { FxState } from '../fx/fx-state.ts';
-import { Sim } from '../sim/sim.ts';
 import { makeSim, stageMode } from '../sim/sim.test-support.ts';
+import { Sim } from '../sim/sim.ts';
 import { computeLayout } from './layout.ts';
 import { LOOK } from './look.ts';
+import { findNodes, isPow } from '../../../engine/node-graph.test-support.ts';
 import { BreakoutView } from './scene.ts';
 
 const still: CameraOffset = { x: 0, y: 0, rotation: 0, zoom: 1 };
@@ -53,7 +55,7 @@ describe('BreakoutView.apply', () => {
     const bloom = new BloomSpy();
     view.setPost(bloom);
     const fx = busyFx();
-    view.apply(fx, frameAt(42));
+    view.apply(fx, frameAt(42), 1);
     const u = view.uniforms;
     expect(u.time.value).toBe(42);
     expect([u.beat.value, u.intensity.value, u.tier.value, u.hue.value, u.glow.value, u.danger.value]).toEqual([0.5, 0.25, 2.5, 1.25, 0.375, 0.75]);
@@ -70,8 +72,8 @@ describe('BreakoutView.apply', () => {
 
   test('新しい FxState を写すと、前のプレイの値は何も残らない', () => {
     const view = new BreakoutView();
-    view.apply(busyFx(), frameAt(42));
-    view.apply(createFxState(false), frameAt(50));
+    view.apply(busyFx(), frameAt(42), 1);
+    view.apply(createFxState(false), frameAt(50), 1);
     const u = view.uniforms;
     expect([u.flash.value, u.inhale.value, u.vignette.value, u.danger.value, u.endless.value]).toEqual([0, 0, 0, 0, 0]);
     expect(u.shock.value.toArray()).toEqual([0, 0, PRESENT_LONG_AGO, SHOCK_SPEED_IDLE]);
@@ -83,7 +85,7 @@ describe('BreakoutView.apply', () => {
   test('作った直後の uniform は、何も起きていない FxState を写したものと同じ', () => {
     const fresh = new BreakoutView();
     const applied = new BreakoutView();
-    applied.apply(createFxState(false), frameAt(0));
+    applied.apply(createFxState(false), frameAt(0), 1);
     const values = (v: BreakoutView) =>
       Object.values(v.uniforms).map((n) => {
         const value = (n as { value?: unknown }).value;
@@ -96,17 +98,26 @@ describe('BreakoutView.apply', () => {
     applied.dispose();
   });
 
+  test('衝撃に伴う画面上の効果の倍率（jolt）を u.jolt へ写し、ブロックの揺れと震えはそれを掛けて動く', () => {
+    const view = new BreakoutView();
+    view.apply(createFxState(false), frameAt(1), 0.25);
+    expect(view.uniforms.jolt.value).toBe(0.25);
+    const m = view.blocks.mesh.material as THREE.MeshBasicNodeMaterial;
+    expect(m.positionNode && findNodes(m.positionNode, (n) => n === view.uniforms.jolt).length).toBeGreaterThan(0);
+    view.dispose();
+  });
+
   test('bloom は値が変わったときだけ送る', () => {
     const view = new BreakoutView();
     const bloom = new BloomSpy();
     view.setPost(bloom);
     expect(bloom.calls.length).toBe(1);
     const fx = createFxState(false);
-    view.apply(fx, frameAt(1));
-    view.apply(fx, frameAt(2));
+    view.apply(fx, frameAt(1), 1);
+    view.apply(fx, frameAt(2), 1);
     expect(bloom.calls.length).toBe(1);
     fx.bloomStrength += 0.1;
-    view.apply(fx, frameAt(3));
+    view.apply(fx, frameAt(3), 1);
     expect(bloom.calls.length).toBe(2);
     view.dispose();
   });
@@ -117,13 +128,13 @@ describe('BreakoutView.sync', () => {
     const view = new BreakoutView();
     const src = { sim: Sim.idle(), presentOffset: 0 };
     const fx = createFxState(false);
-    view.apply(fx, frameAt(0));
+    view.apply(fx, frameAt(0), 1);
     view.sync(src, 0, 4.5, still, false);
     expect(view.flash.mesh.visible).toBe(false);
     expect(view.vignette.mesh.visible).toBe(false);
     fx.flash = 1e-3;
     fx.vignette = 0.2;
-    view.apply(fx, frameAt(0));
+    view.apply(fx, frameAt(0), 1);
     view.sync(src, 0, 4.5, still, false);
     expect(view.flash.mesh.visible).toBe(true);
     expect(view.vignette.mesh.visible).toBe(true);
@@ -159,6 +170,26 @@ describe('BreakoutView.sync', () => {
     expect(c.top - c.bottom).toBeCloseTo(layout.top - layout.bottom, 9);
     expect(c.position.x).toBeCloseTo(4.5 + 0.25, 9);
     expect(c.rotation.z).toBeCloseTo(0.01, 9);
+    view.dispose();
+  });
+});
+
+describe('シェーダーの式', () => {
+  test('式の中の pow を見つけられる（Fn の中も辿る）', () => {
+    expect(findNodes(Fn(() => float(2).add(1).pow(3))(), isPow).length).toBeGreaterThan(0);
+    expect(findNodes(Fn(() => float(2).add(1).mul(3))(), isPow).length).toBe(0);
+  });
+
+  test('ブロック崩しのシェーダーは pow を使わない（負の底で値が決まらないため、累乗は掛け算で書く）', () => {
+    const view = new BreakoutView();
+    const own = { background: view.background, debris: view.debris, blocks: view.blocks, balls: view.balls, fallenBalls: view.fallenBalls, paddle: view.paddle };
+    const found: string[] = [];
+    for (const [name, part] of Object.entries(own)) {
+      const m = part.mesh.material as THREE.MeshBasicNodeMaterial;
+      if (m.positionNode && findNodes(m.positionNode, isPow).length > 0) found.push(`${name}.positionNode`);
+      if (m.colorNode && findNodes(m.colorNode, isPow).length > 0) found.push(`${name}.colorNode`);
+    }
+    expect(found).toEqual([]);
     view.dispose();
   });
 });

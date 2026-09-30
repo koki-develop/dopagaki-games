@@ -1,25 +1,22 @@
-import { useId } from 'react';
-import { settings } from '../juice/settings.ts';
-import type { Settings } from '../juice/settings.ts';
-import Dialog from './ui/Dialog.tsx';
-import { useSettings } from './useSettings.ts';
+import { useId, useSyncExternalStore } from 'react';
+import type { GameSettings, SettingItem, SettingValues } from '../../juice/settings.ts';
+import Dialog from './Dialog.tsx';
 
-type Props = { onClose: () => void };
+type Props<T extends SettingValues> = {
+  settings: GameSettings<T>;
+  /** 並べる項目。各項目はオン / オフのラジオボタン */
+  items: readonly SettingItem<T>[];
+  onClose: () => void;
+};
 
-const ITEMS: { key: keyof Settings; label: string }[] = [
-  { key: 'shake', label: '画面の揺れ' },
-  { key: 'sfx', label: '効果音' },
-  { key: 'bgm', label: 'BGM' },
-];
-
-/** 全ゲーム共通の設定。どのゲームからでも 1 タップで開く。各項目はオン / オフのラジオボタン */
-export default function SettingsPanel({ onClose }: Props) {
-  const s = useSettings();
+/** ゲームの設定。どのゲームでも、そのゲームの項目と保存先を渡して開く */
+export default function SettingsPanel<T extends SettingValues>({ settings, items, onClose }: Props<T>) {
+  const s = useSyncExternalStore(settings.subscribe, settings.get);
   const name = useId();
 
   return (
     <Dialog title="設定">
-      {ITEMS.map(({ key, label }, i) => (
+      {items.map(({ key, label }, i) => (
         <fieldset key={key} className="setting">
           <legend className="setting-label">{label}</legend>
           <div className="segmented">
@@ -29,7 +26,7 @@ export default function SettingsPanel({ onClose }: Props) {
                   type="radio"
                   name={`${name}-${key}`}
                   checked={s[key] === on}
-                  onChange={() => settings.update({ [key]: on })}
+                  onChange={() => settings.update({ [key]: on } as Partial<T>)}
                   data-autofocus={i === 0 && s[key] === on ? true : undefined}
                 />
                 <span>{on ? 'オン' : 'オフ'}</span>

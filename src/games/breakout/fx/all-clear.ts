@@ -1,6 +1,6 @@
 import type { CameraRig } from '../../../juice/camera.ts';
 import type { FlashLimiter } from '../../../juice/flash.ts';
-import type { FrameTime } from '../frame-time.ts';
+import type { FrameTime } from '../../../juice/frame-time.ts';
 import type { Atmosphere } from './atmosphere.ts';
 import type { ParticleFx } from './particle-fx.ts';
 import type { Shockwave } from './shockwave.ts';

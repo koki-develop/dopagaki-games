@@ -1,8 +1,9 @@
+import type { SilenceHandle, SoundHandle } from '../../../juice/audio/engine.ts';
 import type { CameraRig } from '../../../juice/camera.ts';
 import type { FlashLimiter } from '../../../juice/flash.ts';
+import type { FrameTime } from '../../../juice/frame-time.ts';
 import type { WorldClock } from '../../../juice/time.ts';
 import { BALL_CAP, BlockType, FIELD_H, FIELD_W } from '../config.ts';
-import type { FrameTime } from '../frame-time.ts';
 import type { Sim } from '../sim/sim.ts';
 import { LOOK } from '../view/look.ts';
 import type { Atmosphere } from './atmosphere.ts';
@@ -35,13 +36,15 @@ const MAX_STREAK_FX = 160;
 /** 1 フレームで砕ける演出を出す壊れないブロックの数と、そのうち破片も出す数の上限（品質の倍率を掛ける前） */
 const MAX_SHATTER_FX = 24;
 const MAX_SHATTER_DEBRIS_FX = 12;
+/** 炸裂で bloom を強める量。Peak（1.1）と全消し（0.9）より強い */
+const FINALE_BOOST = 1.4;
 /** 溜めの無音から戻すフェード（秒） */
 const SILENCE_FADE_IN = 0.005;
 
 export type FinaleAudio = {
   now(): number;
   readonly running: boolean;
-  silence(duration: number, fadeIn?: number): { cancel(): void };
+  silence(duration: number, fadeIn?: number): SilenceHandle;
 };
 
 type FinaleDeps = {
@@ -78,7 +81,9 @@ export class Finale {
   private stage: FinaleStage = 'idle';
   private x = 0;
   private y = 0;
-  private silenceHandle: { cancel(): void } | null = null;
+  private silenceHandle: SilenceHandle | null = null;
+  /** 溜めの吸い込む音。炸裂で自然に途切れるので、それまでの間だけ持つ */
+  private inhaleSound: SoundHandle | null = null;
   /** 溜めを AudioContext の時刻で測るか。溜めの始まりの時刻（その時間軸） */
   private holdOnAudio = false;
   private holdStartAudio = 0;
@@ -154,7 +159,7 @@ export class Finale {
     this.holdStartAudio = d.audio.now();
     d.clock.slowMo(FINALE_HOLD_SCALE, FINALE_HOLD, FINALE_HOLD_RELEASE);
     this.silenceHandle = d.audio.silence(FINALE_HOLD, SILENCE_FADE_IN);
-    d.sfx.inhale(FINALE_HOLD);
+    this.inhaleSound = d.sfx.inhale(FINALE_HOLD);
     d.atmosphere.resetRiser();
     d.vibrate([40, 40, 120]);
   }
@@ -178,7 +183,7 @@ export class Finale {
 
   /**
    * タップで飛ばす。残りのボールとまだ届いていない光をまとめて得点にし、残りの壊れないブロックも音と粒を出さずに取り除く。
-   * 飛ばせたら true
+   * 溜めの途中なら、無音を解き、吸い込む音を止める。飛ばせたら true
    */
   skip(): boolean {
     const s = this.stage;
@@ -189,6 +194,8 @@ export class Finale {
     sim.creditClearBonus(Infinity);
     this.arrivalCount = 0;
     this.cancelSilence();
+    this.inhaleSound?.stop();
+    this.inhaleSound = null;
     this.stage = 'skipped';
     this.skipReal = this.lastWriteReal;
     return true;
@@ -245,12 +252,16 @@ export class Finale {
   private explode(ft: FrameTime, over: number, budget: number): void {
     const d = this.d;
     this.stage = 'collect';
+    this.inhaleSound = null;
     this.burst = true;
     this.burstReal = ft.real - over;
     this.burstWorld = ft.world;
     d.shockwave.fire(ft.present, this.x, this.y, SHOCK_SPEED);
-    if (d.flashes.request(ft.real)) d.atmosphere.flashTo(LOOK.finaleFlash);
-    if (d.flashes.request(ft.real)) d.atmosphere.boostTo(1.4);
+    // フラッシュと bloom のブーストは 1 回の光なので、許可は 1 回だけ求め、そろえて出す
+    if (d.flashes.request(ft.real)) {
+      d.atmosphere.flashTo(LOOK.finaleFlash);
+      d.atmosphere.boostTo(FINALE_BOOST);
+    }
     d.sfx.finaleBurst();
     d.camera.addTrauma(0.6);
     d.camera.pull(0.12, 0.12, 0.9);

@@ -80,13 +80,13 @@ export function placeBall(sim: Sim, x: number, y: number, dx: number, dy: number
 
 /** 飛んでいるボールをすべて消す。発射待ちかどうかは変えない */
 export function clearBalls(sim: Sim): void {
-  inner(sim).ballStore.clear();
+  inner(sim).ballStore.count = 0;
 }
 
 /** パドルに乗ったボールを消し、ボールが 1 個もない状態にする（次のステップでボール 0 になる） */
 export function dropAllBalls(sim: Sim): void {
   inner(sim)._attached = false;
-  inner(sim).ballStore.clear();
+  inner(sim).ballStore.count = 0;
 }
 
 /** 行 row（一番下が 0）・列 col のセルを、種類 type・HP hp のブロックに置き直す */

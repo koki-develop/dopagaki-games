@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
+import { Rng } from '../../../shared/rng.ts';
 import { EVENT_KIND_COUNT, EventKind, EventQueue, Signal } from './events.ts';
-import { Rng } from './rng.ts';
 
 describe('EventQueue', () => {
   test('容量を超えた分は積まないが、件数は数え続ける', () => {

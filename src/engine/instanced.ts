@@ -5,7 +5,6 @@ import { RingCursor } from './ring.ts';
 import type { DirtySink } from './ring.ts';
 import { UploadScheduler } from './upload-ranges.ts';
 
-
 /**
  * インスタンスごとのデータを vec4 の並び（lanes 本）で持つバッファ。
  *
@@ -67,14 +66,6 @@ export class InstanceRing {
 
   get data(): Float32Array {
     return this.buffer.data;
-  }
-
-  get stride(): number {
-    return this.buffer.stride;
-  }
-
-  get capacity(): number {
-    return this.buffer.capacity;
   }
 
   /** 描画するインスタンス数。これまでに書いた一番後ろまで（2 以上） */

@@ -1,4 +1,3 @@
-import * as THREE from 'three/webgpu';
 import {
   abs,
   Break,
@@ -22,12 +21,13 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
+import * as THREE from 'three/webgpu';
+import { InstanceBuffer, unitQuad } from '../../../engine/instanced.ts';
+import { drawCount } from '../../../engine/ring.ts';
+import { neon, sdRoundBox, sdSegment } from '../../../engine/tsl.ts';
 import { BLOCK_H, BLOCK_W, BlockType, CELL_H, COLS, FIELD_H } from '../config.ts';
 import { cellCenterX, ROW_CAPACITY } from '../sim/blocks.ts';
 import { cellRandomTable } from './cell-random.ts';
-import { InstanceBuffer, unitQuad } from '../../../engine/instanced.ts';
-import { drawCount } from '../../../engine/ring.ts';
-import { neon, sdRoundBox, sdSegment } from './tsl.ts';
 import { LOOK } from './look.ts';
 import { BLOCK_HUE_BOTTOM, BLOCK_HUE_SPAN, HARD_MIX, HARD_RGB, MEGA_HUE_PER_X, MEGA_HUE_SPEED, SOLID_RGB } from './palette.ts';
 import type { ViewUniforms } from './uniforms.ts';
@@ -44,7 +44,7 @@ const SOLID_STRIPE_PITCH = 0.22;
  * ブロックの格子の読み取り口。version は、描画に使う内容（種類・HP・当たった時刻・出現時刻・行の位置）が
  * 変わるたびに増える。
  */
-export type BlockSource = {
+type BlockSource = {
   readonly version: number;
   readonly rowCount: number;
   readonly type: ArrayLike<number>;
@@ -58,6 +58,7 @@ export type BlockSource = {
 
 /**
  * ブロック。インスタンスごとに (中心 x, 中心 y, 種類, 残り HP の割合) と (当たった時刻, 出現時刻, 乱数, 未使用) を持つ。
+ * 演出の強さに応じた揺れと、当たったときの震えは、設定の「画面の揺れ」と「視差効果を減らす」から決まる倍率（u.jolt）で弱める。
  * 種類は色だけでなく形でも区別する:
  * - ボール入り: 中に光るコアが 1 つ
  * - ハード: 内枠の二重線と、並んだ 2 つのコア。当たるたびにひびが入り、光が漏れる
@@ -86,13 +87,16 @@ export class BlocksView {
     const isSolid = typeIs(BlockType.Solid);
     const movable = float(1).sub(isSolid);
 
-    // 頂点: 出現の拡大と、当たったときの揺れ
+    // 頂点: 出現の拡大と、当たったときの震え。震えと揺れは、衝撃に伴う画面上の効果なので u.jolt を掛ける
     const hitAge = u.time.sub(b.x);
-    const wob = exp(hitAge.mul(-14)).mul(sin(hitAge.mul(55))).mul(0.16).mul(step(0, hitAge)).mul(movable);
+    const wob = exp(hitAge.mul(-14)).mul(sin(hitAge.mul(55))).mul(0.16).mul(step(0, hitAge)).mul(movable).mul(u.jolt);
     const bornAge = u.time.sub(b.y);
     const appear = clamp(bornAge.div(0.35), 0, 1);
-    const appearScale = float(1).add(float(1.7).mul(appear.sub(1).pow(3))).add(float(0.7).mul(appear.sub(1).pow(2)));
-    const jiggle = sin(u.time.mul(47).add(b.z.mul(6.28))).mul(u.intensity).mul(0.025).mul(movable);
+    // 出現の残り（-1〜0）。負の底の累乗は pow では値が決まらないので、掛け算で書く
+    const rest = appear.sub(1);
+    const rest2 = rest.mul(rest);
+    const appearScale = float(1).add(rest2.mul(rest).mul(1.7)).add(rest2.mul(0.7));
+    const jiggle = sin(u.time.mul(47).add(b.z.mul(6.28))).mul(u.intensity).mul(0.025).mul(movable).mul(u.jolt);
     const size = vec2(BLOCK_W + PAD * 2, BLOCK_H + PAD * 2);
     // 種類 0 は使っていないインスタンスなので、大きさ 0 にして描かない
     const scale = vec2(float(1).add(wob), float(1).sub(wob)).mul(appearScale.max(0)).mul(step(0.5, a.z));
@@ -149,12 +153,15 @@ export class BlocksView {
       const pulse = sin(u.time.mul(4.5).add(b.z.mul(6.28))).mul(0.5).add(0.5);
       const coreR = float(BLOCK_H * 0.2);
       // コアの数は、壊したときに出るボールの数に合わせる（ボール入り 1 つ、ハード 2 つ、ボール大量 6 つ、壊れない 0）
-      const single = exp(p.length().div(coreR).pow(2).mul(-1.4)).mul(float(1).sub(isMega).sub(isHard).sub(isSolid));
-      const pair = exp(vec2(abs(p.x).sub(BLOCK_W * 0.16), p.y).length().div(coreR.mul(0.85)).pow(2).mul(-1.4)).mul(isHard);
+      const singleR = p.length().div(coreR);
+      const single = exp(singleR.mul(singleR).mul(-1.4)).mul(float(1).sub(isMega).sub(isHard).sub(isSolid));
+      const pairR = vec2(abs(p.x).sub(BLOCK_W * 0.16), p.y).length().div(coreR.mul(0.85));
+      const pair = exp(pairR.mul(pairR).mul(-1.4)).mul(isHard);
       // ボール大量: 3 列 × 2 行の 6 つ
       const colD = min(abs(p.x), abs(abs(p.x).sub(BLOCK_W * 0.28)));
       const q = vec2(colD, abs(p.y).sub(BLOCK_H * 0.2));
-      const quad = exp(q.length().div(BLOCK_H * 0.12).pow(2).mul(-1.4)).mul(isMega);
+      const quadR = q.length().div(BLOCK_H * 0.12);
+      const quad = exp(quadR.mul(quadR).mul(-1.4)).mul(isMega);
       const coreCol = mix(vec3(0.9, 1.0, 1.1), neon(hueT.add(0.1)), 0.35);
       col.addAssign(coreCol.mul(single.add(pair).add(quad.mul(pulse.mul(0.8).add(0.6)))).mul(pulse.mul(LOOK.block.corePulse).add(LOOK.block.core)).mul(body));
 

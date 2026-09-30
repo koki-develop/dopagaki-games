@@ -1,6 +1,12 @@
 /** 保存先として使う Storage の一部 */
 export type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
 
+/** `storage` イベントの届け先。ブラウザでは window */
+export type StorageEventSource = {
+  addEventListener(type: 'storage', listener: (e: { readonly key: string | null }) => void): void;
+  removeEventListener(type: 'storage', listener: (e: { readonly key: string | null }) => void): void;
+};
+
 /** 使えるかどうかを確かめるために読むキー。値があってもなくてもよい */
 const PROBE_KEY = 'dopagaki:probe';
 
@@ -18,4 +24,9 @@ export function safeLocalStorage(): Storage | null {
   } catch {
     return null;
   }
+}
+
+/** 別のタブでの保存を知らせる `storage` イベントの発生元。ブラウザでは window、ない環境では null */
+export function windowEvents(): StorageEventSource | null {
+  return typeof window !== 'undefined' ? window : null;
 }

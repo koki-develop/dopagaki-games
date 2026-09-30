@@ -57,9 +57,10 @@ describe('renderHead', () => {
 });
 
 describe('renderDocument', () => {
-  test('<html> に画面の名前を書き、<head> の末尾にタグを足す', () => {
+  test('ゲームの画面なら <html> に data-game を書き、<head> の末尾にタグを足す', () => {
     const html = renderDocument(INDEX, { route: 'breakout', ogImage });
-    expect(html).toContain('<html lang="ja" data-route="breakout">');
+    expect(html).toContain('<html lang="ja" data-game>');
+    expect(renderDocument(INDEX, { route: 'portal', ogImage })).toContain('<html lang="ja">');
     expect(html.indexOf('<title>')).toBeGreaterThan(html.indexOf('<meta charset="UTF-8" />'));
     expect(html.indexOf('<title>')).toBeLessThan(html.indexOf('</head>'));
     expect(html).toContain('<div id="root"></div>');

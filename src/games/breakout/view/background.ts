@@ -1,4 +1,3 @@
-import * as THREE from 'three/webgpu';
 import {
   abs,
   exp,
@@ -21,15 +20,16 @@ import {
   vec2,
   vec3,
 } from 'three/tsl';
-import { DANGER_Y, FIELD_H, FIELD_W, PIT_TOP } from '../config.ts';
-import { neon } from './tsl.ts';
-import { LOOK } from './look.ts';
-import { WALL_HIT_SLOTS } from '../fx/fx-state.ts';
-import type { ViewUniforms } from './uniforms.ts';
-import { DENSITY_H, DENSITY_W, DensityGrid, isWarpActive, WARP_TIER_FULL, WARP_TIER_START } from './density.ts';
-import { WALL_GLOW, WALL_WAVE, wallWaveBounds } from './wall-wave.ts';
-import { DANGER_LINE, dangerReach, farWallNegligible, SHOCK_RING, shockAge, shockReach, WALL_GLOW_BAND } from './background-reach.ts';
+import * as THREE from 'three/webgpu';
+import { neon } from '../../../engine/tsl.ts';
 import { clamp01 } from '../../../shared/math.ts';
+import { DANGER_Y, FIELD_H, FIELD_W, PIT_TOP } from '../config.ts';
+import { WALL_HIT_SLOTS } from '../fx/fx-state.ts';
+import { DANGER_LINE, dangerReach, farWallNegligible, SHOCK_RING, shockAge, shockReach, WALL_GLOW_BAND } from './background-reach.ts';
+import { DENSITY_H, DENSITY_W, DensityGrid, isWarpActive, WARP_TIER_FULL, WARP_TIER_START } from './density.ts';
+import { LOOK } from './look.ts';
+import type { ViewUniforms } from './uniforms.ts';
+import { WALL_GLOW, WALL_WAVE, wallWaveBounds } from './wall-wave.ts';
 import type { WallHit, WallWaveBounds } from './wall-wave.ts';
 
 const GRID = 0.5;

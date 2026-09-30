@@ -1,8 +1,10 @@
 import * as THREE from 'three/webgpu';
-import type { CameraOffset } from '../../../juice/camera.ts';
+import { ParticlesView } from '../../../engine/particles.ts';
 import type { PostChain } from '../../../engine/post.ts';
+import { FocusVignette, ScreenFlash } from '../../../engine/screen-fx.ts';
+import type { CameraOffset } from '../../../juice/camera.ts';
+import type { FrameTime } from '../../../juice/frame-time.ts';
 import { FIELD_H, FIELD_W, PADDLE_Y } from '../config.ts';
-import type { FrameTime } from '../frame-time.ts';
 import { DEBRIS_CAPACITY } from '../fx/debris.ts';
 import { WALL_HIT_SLOTS } from '../fx/fx-state.ts';
 import type { FxState } from '../fx/fx-state.ts';
@@ -12,13 +14,10 @@ import { BallsView, createBallLook, FallenBallsView } from './balls.ts';
 import type { BallLook } from './balls.ts';
 import { BlocksView } from './blocks.ts';
 import { DebrisView } from './debris.ts';
-import { FlashView } from './flash.ts';
 import type { Layout } from './layout.ts';
-import { PaddleView } from './paddle.ts';
-import { ParticlesView } from './particles.ts';
 import { LOOK } from './look.ts';
+import { PaddleView } from './paddle.ts';
 import { createViewUniforms } from './uniforms.ts';
-import { VignetteView } from './vignette.ts';
 import type { ViewUniforms } from './uniforms.ts';
 
 const PARTICLE_CAPACITY = 6000;
@@ -41,8 +40,9 @@ export type SceneSource = {
  * ブロック崩しの描画一式。orthographic カメラで、フィールドを 2.5D の平面として描く。
  * 描画順: 背景 → 破片 → ブロック → パーティクル → ボール（奈落に落ちたボールも） → パドル → ビネット → フラッシュ
  *
- * 1 フレームの書き出しは `apply(fx, ft)`（uniform・bloom・パドルの変形）→ `sync(...)`（インスタンスとカメラ）の順。
- * uniform を書くのは apply だけで、毎フレーム FxState の全部の値を写すので、前のプレイの値は残りようがない。
+ * 1 フレームの書き出しは `apply(fx, ft, jolt)`（uniform・bloom・パドルの変形）→ `sync(...)`（インスタンスとカメラ）の順。
+ * 演出の状態（FxState）を写すのは apply だけで、毎フレーム全部の値を写すので、前のプレイの値は残りようがない。
+ * sync が書くのは、世界の状態（sim とパドルを描く位置）から決まる値だけ。
  */
 export class BreakoutView {
   readonly scene = new THREE.Scene();
@@ -56,8 +56,8 @@ export class BreakoutView {
   readonly paddle: PaddleView;
   readonly particles: ParticlesView;
   readonly debris: DebrisView;
-  readonly flash: FlashView;
-  readonly vignette: VignetteView;
+  readonly flash: ScreenFlash;
+  readonly vignette: FocusVignette;
   private post: BloomTarget | null = null;
   private bloomStrength: number = LOOK.bloom.base;
   private bloomRadius: number = LOOK.bloom.radius;
@@ -68,12 +68,26 @@ export class BreakoutView {
     this.background = new BackgroundView(u);
     this.debris = new DebrisView(u, DEBRIS_CAPACITY);
     this.blocks = new BlocksView(u);
-    this.particles = new ParticlesView(u, PARTICLE_CAPACITY);
+    this.particles = new ParticlesView({
+      capacity: PARTICLE_CAPACITY,
+      time: u.time,
+      brightness: LOOK.particles,
+      renderOrder: 30,
+      attract: { point: u.focus, amount: u.inhale.mul(0.22) },
+    });
     this.balls = new BallsView(u, this.ballLook);
     this.fallenBalls = new FallenBallsView(u, this.ballLook, FALLEN_BALL_CAPACITY);
     this.paddle = new PaddleView(u);
-    this.flash = new FlashView(u);
-    this.vignette = new VignetteView(u);
+    this.flash = new ScreenFlash({ level: u.flash, renderOrder: 100 });
+    this.vignette = new FocusVignette({
+      strength: u.vignette,
+      focus: u.focus,
+      outerRadius: 14,
+      innerRadius: 1.2,
+      band: 3.5,
+      darkness: 0.92,
+      renderOrder: 90,
+    });
     for (const m of [this.background, this.debris, this.blocks, this.particles, this.fallenBalls, this.balls, this.paddle, this.vignette, this.flash]) this.scene.add(m.mesh);
     this.camera.position.set(FIELD_W / 2, FIELD_H / 2, 5);
   }
@@ -108,12 +122,14 @@ export class BreakoutView {
   }
 
   /**
-   * 演出の状態を uniform・bloom・パドルの変形へ写す。uniform を書くのはここだけ。
+   * 演出の状態を uniform・bloom・パドルの変形へ写す。FxState を写すのはここだけ。
    * u.time は ft.present（粒や破片の発生時刻、衝撃波や壁の揺れの開始時刻と同じ時間軸）。
+   * jolt は衝撃に伴う画面上の効果の倍率（CameraMotion.jolt）で、ブロックの揺れと震えに掛ける。
    */
-  apply(fx: FxState, ft: FrameTime): void {
+  apply(fx: FxState, ft: FrameTime, jolt: number): void {
     const u = this.uniforms;
     u.time.value = ft.present;
+    u.jolt.value = jolt;
     u.beat.value = fx.beat;
     u.intensity.value = fx.intensity;
     u.tier.value = fx.tier;

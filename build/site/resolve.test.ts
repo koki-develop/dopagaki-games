@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { resolvePage } from './resolve.ts';
+import { isPageRequest, resolvePage } from './resolve.ts';
 
 describe('resolvePage', () => {
   test('ページのパスはその画面をステータス 200 で返す', () => {
@@ -22,5 +22,24 @@ describe('resolvePage', () => {
   test('どのページにも当たらないパスは 404 の画面をステータス 404 で返す', () => {
     for (const path of ['/nope', '/nope.html', '/BreakOut', '/breakout/x', '/portal', '/index'])
       expect(resolvePage(path)).toEqual({ kind: 'page', route: 'notFound', status: 404 });
+  });
+});
+
+describe('isPageRequest', () => {
+  const HTML = 'text/html,application/xhtml+xml,*/*;q=0.8';
+
+  test('ブラウザがページを開く GET と HEAD', () => {
+    for (const path of ['/', '/breakout', '/breakout/', '/breakout.html', '/nope/x']) {
+      expect(isPageRequest('GET', HTML, path)).toBe(true);
+      expect(isPageRequest('HEAD', HTML, path)).toBe(true);
+    }
+  });
+
+  test('スクリプトや画像の読み込み、拡張子の付いたファイル、GET と HEAD 以外は含めない', () => {
+    expect(isPageRequest('GET', '*/*', '/@vite/client')).toBe(false);
+    expect(isPageRequest('GET', undefined, '/breakout')).toBe(false);
+    expect(isPageRequest('GET', HTML, '/assets/index-abc.js')).toBe(false);
+    expect(isPageRequest('GET', HTML, '/og/portal-0123.png')).toBe(false);
+    expect(isPageRequest('POST', HTML, '/breakout')).toBe(false);
   });
 });

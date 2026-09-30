@@ -1,14 +1,16 @@
+import type { FatalCause } from '../../shared/fatal.ts';
 import { errorMessage } from '../../shared/errors.ts';
-import type { RecordsStore } from './records.ts';
-import type { FatalCause, GamePort, RunMode, RunResult } from './types.ts';
+import { createMachineStore } from '../../shared/machine.ts';
+import type { MachineStore, Transition as MachineTransition } from '../../shared/machine.ts';
+import { pauseMenuStep } from '../../shared/pause-menu.ts';
+import type { PauseMenuEvent, PauseSheet } from '../../shared/pause-menu.ts';
+import type { RecordsStore } from './records-model.ts';
+import type { GamePort, RunMode, RunResult } from './types.ts';
 
 /**
  * ブロック崩しの画面の状態機械。画面（React）はイベントを送り、ゲームへの命令はここで決める。
  * `transition` は純粋関数で、命令（Command）は `createControllerStore` が GamePort と記録へ実行する。
  */
-
-/** 画面の上に重ねるもの。タイトルでは設定だけを開ける */
-type Sheet = null | 'settings' | 'confirmRetry' | 'confirmTitle';
 
 export type Phase =
   | { k: 'loading' }
@@ -17,13 +19,15 @@ export type Phase =
   | { k: 'stages' }
   | { k: 'ready'; mode: RunMode }
   | { k: 'playing'; mode: RunMode }
-  | { k: 'paused'; mode: RunMode; sheet: Sheet }
+  | { k: 'paused'; mode: RunMode; sheet: PauseSheet }
   /** 勝敗が決まり、結果画面までの演出を見せている。一時停止はできない */
   | { k: 'ending'; mode: RunMode }
   /** shownAt は結果画面を出した時刻（ms）。直後の操作は受け付けない */
   | { k: 'result'; mode: RunMode; result: RunResult; shownAt: number };
 
 export type ControllerEvent =
+  /** 一時停止中の画面の操作と、Escape キー */
+  | PauseMenuEvent
   | { t: 'loaded' }
   /** ゲームを続けられなくなった。cause で画面に出す文言を選ぶ */
   | { t: 'fatal'; cause: FatalCause; message: string }
@@ -34,19 +38,11 @@ export type ControllerEvent =
   | { t: 'pause' }
   /** タブが隠れた */
   | { t: 'hidden' }
-  | { t: 'resume' }
-  | { t: 'askRetry' }
-  | { t: 'askTitle' }
-  | { t: 'confirm' }
-  | { t: 'cancel' }
-  | { t: 'openSettings' }
-  | { t: 'closeSettings' }
   | { t: 'runEnding' }
   | { t: 'finished'; result: RunResult }
   | { t: 'retry' }
   | { t: 'next' }
-  | { t: 'toTitle' }
-  | { t: 'escape' };
+  | { t: 'toTitle' };
 
 export type Command =
   | { c: 'prepare'; mode: RunMode; previousBest: number }
@@ -65,29 +61,10 @@ export type ControllerContext = {
   best(mode: RunMode): number;
 };
 
-type Transition = { state: Phase; commands: Command[] };
-
-/**
- * 結果画面の演出の時刻（ms、結果画面を出した時点から）。CSS のアニメーションへは、結果画面がカスタムプロパティで渡す。
- * 見出しは headingMs かけて叩きつけられ、その 60% の時点（330ms）で縮みきって着地する。
- */
-export const RESULT_REVEAL = {
-  /** 見出しが叩きつけられる演出の長さ */
-  headingMs: 550,
-  /** 見出しの着地の直後。ここから操作を受け付け、スコアのカウントアップを始める */
-  settleMs: 350,
-  /** スコアの枠が弾けて出る時刻 */
-  scorePopAtMs: 250,
-  /** スコアの枠と NEW BEST! が弾けて出る演出の長さ */
-  popMs: 400,
-  /** スコアのカウントアップの長さ */
-  countUpMs: 1100,
-  /** NEW BEST! が弾けて出る時刻 */
-  newBestAtMs: 1100,
-} as const;
+type Transition = MachineTransition<Phase, Command>;
 
 /** 結果画面を出してから操作を受け付けるまでの時間（ms）。演出を飛ばすための連打で、次の操作まで押してしまわないようにする */
-export const RESULT_INPUT_GUARD_MS = RESULT_REVEAL.settleMs;
+export const RESULT_INPUT_GUARD_MS = 350;
 
 export const hasNextStage = (result: RunResult, stageCount: number): boolean =>
   result.mode.kind === 'stage' && result.cleared && result.mode.index + 1 < stageCount;
@@ -115,11 +92,6 @@ const pause = (mode: RunMode): Transition => ({ state: { k: 'paused', mode, shee
 
 const isStage = (mode: RunMode, ctx: ControllerContext): boolean =>
   mode.kind === 'stage' && Number.isInteger(mode.index) && mode.index >= 0 && mode.index < Math.min(ctx.stageCount, ctx.selectableStages);
-
-/** switch で扱い漏れがないことを型で確かめる。実行時に来たら状態の型と実装が食い違っている */
-const unreachable = (v: never): never => {
-  throw new Error(`unreachable: ${String(v)}`);
-};
 
 export function transition(state: Phase, event: ControllerEvent, ctx: ControllerContext): Transition {
   if (event.t === 'fatal') {
@@ -177,39 +149,21 @@ export function transition(state: Phase, event: ControllerEvent, ctx: Controller
           return to(state);
       }
 
-    case 'paused':
+    case 'paused': {
       // 一時停止中のゲームは世界を進めないので、勝敗（runEnding / finished）は届かない
-      switch (state.sheet) {
-        case null:
-          switch (event.t) {
-            case 'resume':
-            case 'escape':
-              return { state: { k: 'playing', mode: state.mode }, commands: [{ c: 'setPaused', paused: false }] };
-            case 'askRetry':
-              return to({ ...state, sheet: 'confirmRetry' });
-            case 'askTitle':
-              return to({ ...state, sheet: 'confirmTitle' });
-            case 'openSettings':
-              return to({ ...state, sheet: 'settings' });
-            default:
-              return to(state);
-          }
-        case 'settings':
-          return event.t === 'closeSettings' || event.t === 'escape' ? to({ ...state, sheet: null }) : to(state);
-        case 'confirmRetry':
-        case 'confirmTitle':
-          switch (event.t) {
-            case 'cancel':
-            case 'escape':
-              return to({ ...state, sheet: null });
-            case 'confirm':
-              return state.sheet === 'confirmRetry' ? restart(state.mode, ctx) : { state: { k: 'title', sheet: null }, commands: [{ c: 'endRun' }] };
-            default:
-              return to(state);
-          }
-        default:
-          return unreachable(state);
+      const step = pauseMenuStep(state.sheet, event.t);
+      if (!step) return to(state);
+      switch (step.k) {
+        case 'sheet':
+          return to({ ...state, sheet: step.sheet });
+        case 'resume':
+          return { state: { k: 'playing', mode: state.mode }, commands: [{ c: 'setPaused', paused: false }] };
+        case 'retry':
+          return restart(state.mode, ctx);
+        case 'title':
+          return { state: { k: 'title', sheet: null }, commands: [{ c: 'endRun' }] };
       }
+    }
 
     case 'ending':
       return event.t === 'finished' ? finish(state.mode, event.result, ctx) : to(state);
@@ -226,23 +180,11 @@ export function transition(state: Phase, event: ControllerEvent, ctx: Controller
   }
 }
 
-interface ControllerStore {
-  getSnapshot(): Phase;
-  subscribe(listener: () => void): () => void;
-  /** 状態を進め、命令を実行する。命令の実行中に届いたイベントは、その後で順に処理する */
-  dispatch(event: ControllerEvent): void;
-}
-
 /**
- * 画面の状態機械を React から useSyncExternalStore で使える形にする。
- * 命令は React の更新関数の外で、ちょうど 1 回だけ実行する。記録は最新の値をその場で読む。
+ * 画面の状態機械を React から useSyncExternalStore で使える形にする。記録は最新の値をその場で読む。
+ * 命令が失敗したら、ゲームの処理の失敗（internal）としてエラー画面へ移る。
  */
-export function createControllerStore(port: GamePort, records: RecordsStore, now: () => number): ControllerStore {
-  let state: Phase = { k: 'loading' };
-  const listeners = new Set<() => void>();
-  const queue: ControllerEvent[] = [];
-  let running = false;
-
+export function createControllerStore(port: GamePort, records: RecordsStore, now: () => number): MachineStore<Phase, ControllerEvent> {
   const context = (): ControllerContext => ({
     now: now(),
     stageCount: records.stageCount,
@@ -270,53 +212,10 @@ export function createControllerStore(port: GamePort, records: RecordsStore, now
     }
   };
 
-  const step = (event: ControllerEvent): void => {
-    const { state: next, commands } = transition(state, event, context());
-    const changed = next !== state;
-    state = next;
-    for (const cmd of commands) {
-      try {
-        execute(cmd);
-      } catch (e) {
-        if (state.k !== 'error') queue.push({ t: 'fatal', cause: 'internal', message: errorMessage(e) });
-        break;
-      }
-    }
-    if (changed) for (const l of listeners) l();
-  };
-
-  return {
-    getSnapshot: () => state,
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => void listeners.delete(listener);
-    },
-    dispatch: (event) => {
-      queue.push(event);
-      if (running) return;
-      running = true;
-      try {
-        for (let e = queue.shift(); e; e = queue.shift()) step(e);
-      } finally {
-        running = false;
-      }
-    },
-  };
-}
-
-/**
- * ゲーム本体ができあがる前から状態機械に渡しておく GamePort。命令は、結びつけたゲームへそのまま渡す。
- * ゲームがまだない（読み込み中・破棄後）ときの命令は捨てる。
- */
-export function createPortRelay(): GamePort & { bind(port: GamePort | null): void } {
-  let target: GamePort | null = null;
-  return {
-    bind: (port) => {
-      target = port;
-    },
-    prepare: (mode, previousBest) => target?.prepare(mode, previousBest),
-    begin: () => target?.begin(),
-    setPaused: (paused) => target?.setPaused(paused),
-    endRun: () => target?.endRun(),
-  };
+  return createMachineStore<Phase, ControllerEvent, Command>({
+    initial: { k: 'loading' },
+    transition: (state, event) => transition(state, event, context()),
+    execute,
+    failed: (e, state) => (state.k === 'error' ? null : { t: 'fatal', cause: 'internal', message: errorMessage(e) }),
+  });
 }

@@ -25,5 +25,5 @@
     "exactOptionalPropertyTypes": true,
     "allowUnreachableCode": false
   },
-  "include": ["src/**/*.test.ts", "src/**/*.test-support.ts", "build/**/*.test.ts", "build/**/*.test-support.ts"]
+  "include": ["src/**/*.test.ts", "src/**/*.test-support.ts", "build/**/*.test.ts", "build/**/*.test-support.ts", "lint/**/*.test.ts"]
 }

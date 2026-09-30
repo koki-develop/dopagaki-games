@@ -104,16 +104,23 @@ describe('BreakoutSfx', () => {
     expect(chord.some((s) => s.stopAt > 1.0)).toBe(true);
   });
 
-  test('鳴らした音はすべて group に属し、stopAll() で残響ごと止まる', () => {
-    const { ctx, group, sfx } = setup();
+  test('鳴らした音はすべて group に属し、stopAll() でまとめて止まる', () => {
+    const { ctx, engine, group, sfx } = setup();
+    const other = new BreakoutSfx(engine, engine.createGroup());
     sfx.resolveChord();
     sfx.inhale(0.3);
     sfx.breakNote(1, 3, 0.5, 1);
-    expect(group.size).toBe(3);
+    const mine = ctx.sources.slice();
+    other.breakNote(1, 3, 0.5, 1);
+    const theirs = ctx.sources.slice(mine.length);
+    const active = () => engine.activeVoices('sfx') + engine.activeVoices('lead');
+    expect(active()).toBe(4);
     ctx.currentTime = 0.1;
     group.stopAll(0.03);
-    expect(group.size).toBe(0);
-    for (const s of ctx.sources) expect(s.stopAt).toBeLessThanOrEqual(0.13 + 1e-9);
+    expect(active()).toBe(1);
+    for (const s of mine) expect(s.stopAt).toBeLessThanOrEqual(0.13 + 1e-9);
+    // ほかのまとまりの音は、自分で予約した stop() のまま
+    for (const s of theirs) expect(s.stopCalls).toBe(1);
   });
 
   test('AudioContext が動いていなければ何も作らない', () => {
@@ -122,6 +129,17 @@ describe('BreakoutSfx', () => {
     const sfx = new BreakoutSfx(engine, engine.createGroup());
     for (const [, play] of NODES_PER_CALL) play(sfx);
     expect(ctx.nodes).toBe(0);
+  });
+
+  test('溜めの吸い込む音は、止めるとすぐに音量を下げ、音源を止める', () => {
+    const { ctx, sfx } = setup();
+    const sources = ctx.sources.length;
+    const handle = sfx.inhale(0.3);
+    const mine = ctx.sources.slice(sources);
+    expect(mine.length).toBeGreaterThan(0);
+    ctx.currentTime = 0.1;
+    handle.stop();
+    for (const src of mine) expect(src.stopAt).toBeLessThanOrEqual(0.1 + 0.05);
   });
 
   test('supersaw のノコギリ波は 1 つのエンベロープにまとめてからローパスへつなぐ', () => {

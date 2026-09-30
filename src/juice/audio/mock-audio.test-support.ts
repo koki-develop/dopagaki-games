@@ -10,16 +10,29 @@ type ParamEvent =
   | { kind: 'cancel'; time: number };
 
 export class MockParam {
-  value: number;
   readonly events: ParamEvent[] = [];
+  /** value で読む値。setValueAtTime でも変わる */
+  private current: number;
+  /** value へ直接書いた値。予約より前の値として valueAt が使う */
+  private base: number;
 
   constructor(value = 0) {
-    this.value = value;
+    this.current = value;
+    this.base = value;
+  }
+
+  get value(): number {
+    return this.current;
+  }
+
+  set value(v: number) {
+    this.current = v;
+    this.base = v;
   }
 
   setValueAtTime(value: number, time: number): this {
     this.events.push({ kind: 'set', value, time });
-    this.value = value;
+    this.current = value;
     return this;
   }
 
@@ -41,6 +54,34 @@ export class MockParam {
   cancelScheduledValues(time: number): this {
     this.events.push({ kind: 'cancel', time });
     return this;
+  }
+
+  /**
+   * 時刻 t の値。予約を Web Audio と同じ規則で並べて求める（cancel はそれより後の予約を消す）。
+   * setTargetAtTime は扱わず、その予約の手前の値のままとする
+   */
+  valueAt(t: number): number {
+    const kept: Exclude<ParamEvent, { kind: 'cancel' }>[] = [];
+    for (const e of this.events) {
+      if (e.kind === 'cancel') {
+        for (let i = kept.length - 1; i >= 0; i--) if (kept[i].time >= e.time) kept.splice(i, 1);
+      } else {
+        kept.push(e);
+      }
+    }
+    kept.sort((a, b) => a.time - b.time);
+    let v = this.base;
+    let at = 0;
+    for (const e of kept) {
+      if (e.time > t) {
+        if (e.kind === 'linear') return v + ((e.value - v) * (t - at)) / (e.time - at);
+        if (e.kind === 'exponential') return v * (e.value / v) ** ((t - at) / (e.time - at));
+        return v;
+      }
+      if (e.kind !== 'target') v = e.value;
+      at = e.time;
+    }
+    return v;
   }
 
   /** 最後に予約された値（ramp / target / set の行き先） */
@@ -101,6 +142,7 @@ export class MockSource extends MockNode {
   readonly playbackRate = new MockParam(1);
   startAt = -1;
   startOffset = 0;
+  onended: (() => void) | null = null;
   /** 最後の stop() の時刻（Web Audio と同じく、最後の呼び出しだけが効く） */
   stopAt = Infinity;
   stopCalls = 0;
@@ -132,15 +174,16 @@ export class MockAudioContext {
   outputLatency = 0;
   readonly destination = new MockNode('destination');
   /** 作ったノードの数（種類別）。コンプレッサーは数えない */
-  readonly created = { gain: 0, oscillator: 0, bufferSource: 0, biquad: 0 };
+  readonly created = { gain: 0, oscillator: 0, bufferSource: 0, biquad: 0, waveShaper: 0 };
   readonly periodicWaves: MockPeriodicWave[] = [];
   readonly sources: MockSource[] = [];
   readonly gains: MockGain[] = [];
+  readonly filters: MockFilter[] = [];
 
   /** 作ったノードの総数 */
   get nodes(): number {
     const c = this.created;
-    return c.gain + c.oscillator + c.bufferSource + c.biquad;
+    return c.gain + c.oscillator + c.bufferSource + c.biquad + c.waveShaper;
   }
 
   resetCounts(): void {
@@ -148,6 +191,7 @@ export class MockAudioContext {
     this.created.oscillator = 0;
     this.created.bufferSource = 0;
     this.created.biquad = 0;
+    this.created.waveShaper = 0;
   }
 
   createGain(): MockGain {
@@ -173,7 +217,9 @@ export class MockAudioContext {
 
   createBiquadFilter(): MockFilter {
     this.created.biquad++;
-    return new MockFilter();
+    const f = new MockFilter();
+    this.filters.push(f);
+    return f;
   }
 
   createDynamicsCompressor(): MockNode {
@@ -182,9 +228,18 @@ export class MockAudioContext {
     return n;
   }
 
-  createBuffer(_channels: number, length: number, sampleRate: number): { duration: number; getChannelData(): Float32Array } {
-    const data = new Float32Array(length);
-    return { duration: length / sampleRate, getChannelData: () => data };
+  createBuffer(channels: number, length: number, sampleRate: number): { duration: number; numberOfChannels: number; getChannelData(channel: number): Float32Array } {
+    const data = Array.from({ length: channels }, () => new Float32Array(length));
+    return { duration: length / sampleRate, numberOfChannels: channels, getChannelData: (channel) => data[channel] };
+  }
+
+  createConvolver(): MockNode & { buffer: unknown; normalize: boolean } {
+    return Object.assign(new MockNode('convolver'), { buffer: null as unknown, normalize: true });
+  }
+
+  createWaveShaper(): MockNode & { curve: Float32Array | null; oversample: string } {
+    this.created.waveShaper++;
+    return Object.assign(new MockNode('waveShaper'), { curve: null as Float32Array | null, oversample: 'none' });
   }
 
   createPeriodicWave(real: Float32Array, imag: Float32Array, constraints?: { disableNormalization?: boolean }): MockPeriodicWave {

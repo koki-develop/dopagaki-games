@@ -6,7 +6,7 @@ import type { SimConfig } from './config.ts';
 import { Run } from './run.ts';
 import type { RunServices } from './run.ts';
 import type { StageDef } from './sim/stage-parse.ts';
-import { Bgm } from './sounds/bgm.ts';
+import { createBreakoutBgm } from './sounds/bgm.ts';
 import { STAGES } from './stages/stages.ts';
 import type { RunMode, RunResult } from './types.ts';
 
@@ -14,7 +14,7 @@ const services = (inputNow = () => 0): RunServices => {
   const audio = new AudioEngine(() => null);
   return {
     audio,
-    bgm: new Bgm(audio),
+    bgm: createBreakoutBgm(audio),
     flashes: new FlashLimiter(3, 1),
     particles: { emit: () => {} },
     debris: { emit: () => {} },

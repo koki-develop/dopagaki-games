@@ -1,5 +1,5 @@
 import type { RunMode } from '../../games/breakout/types.ts';
-import { formatScore } from '../../games/breakout/hud/format.ts';
+import { formatScore } from '../../shared/format.ts';
 import { STAGES } from '../../games/breakout/stages/stages.ts';
 import Overlay from '../ui/Overlay.tsx';
 

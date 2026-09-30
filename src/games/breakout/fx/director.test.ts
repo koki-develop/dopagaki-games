@@ -283,8 +283,9 @@ describe('フィナーレ', () => {
     expect(h.rec.count('audio.silence.cancel')).toBe(1);
     expect(h.finishes).toBe(1);
     h.run(600);
+    // 溜めの途中で飛ばしたので、吸い込む音を止めるだけで、新しい音は鳴らさない
     const after = h.rec.names(before);
-    expect(after.filter((n) => n.startsWith('sfx.'))).toEqual([]);
+    expect(after.filter((n) => n.startsWith('sfx.'))).toEqual(['sfx.inhale.stop']);
     expect(h.vibrations.length).toBe(vib);
     expect(h.fx.flash).toBe(0);
     expect(h.fx.shockStart).toBe(PRESENT_LONG_AGO);
@@ -319,6 +320,30 @@ describe('フラッシュリミッター', () => {
     full.until(() => full.rec.count('sfx.finaleBurst') > 0, 60);
     expect(full.fx.flash).toBe(0);
     expect(full.fx.bloomStrength).toBeLessThan(free.fx.bloomStrength);
+  });
+
+  test('炸裂のフラッシュと bloom のブーストは 1 回の光として、許可を 1 回だけ求める', () => {
+    const free = new Harness({ sim: clearingSim(2) });
+    toEnding(free);
+    free.until(() => free.rec.count('sfx.finaleBurst') > 0, 60);
+
+    // 残りが 1 回のときも、フラッシュとブーストがそろって出る
+    const flashes = new FlashLimiter(3, 1);
+    const last = new Harness({ sim: clearingSim(2), flashes });
+    toEnding(last);
+    for (let i = 0; i < 2; i++) expect(flashes.request(last.real)).toBe(true);
+    last.until(() => last.rec.count('sfx.finaleBurst') > 0, 60);
+    expect(last.fx.flash).toBe(free.fx.flash);
+    expect(last.fx.bloomStrength).toBe(free.fx.bloomStrength);
+
+    // 炸裂のあとも、同じ 1 秒の中で 2 回ぶんの許可が残る
+    const counted = new FlashLimiter(3, 1);
+    const h = new Harness({ sim: clearingSim(2), flashes: counted });
+    toEnding(h);
+    h.until(() => h.rec.count('sfx.finaleBurst') > 0, 60);
+    expect(counted.request(h.real)).toBe(true);
+    expect(counted.request(h.real)).toBe(true);
+    expect(counted.request(h.real)).toBe(false);
   });
 
   test('フラッシュは FLASH_EPSILON 未満で 0 にする', () => {
@@ -356,6 +381,25 @@ describe('振動', () => {
     expect(h.vibrations).toEqual([[30, 40, 60]]);
     h.run(200);
     expect(h.vibrations).toEqual([[30, 40, 60]]);
+  });
+});
+
+describe('負けの演出', () => {
+  test('ボール 0 とゲームオーバーでは、フラッシュも bloom の強調も、祝福の音も出さない', () => {
+    const flashes = new FlashLimiter(3, 1);
+    const h = new Harness({ sim: losingSim(), previousBest: 1e9, flashes });
+    h.frame();
+    const bloom = h.fx.bloomStrength;
+    const from = h.rec.calls.length;
+    dropAllBalls(h.sim);
+    h.until(() => h.finishes > 0, 200);
+    h.run(60);
+    const played = h.rec.names(from).filter((n) => n.startsWith('sfx.'));
+    expect(played).toEqual(['sfx.ballsZero', 'sfx.gameOver']);
+    expect(h.fx.flash).toBe(0);
+    expect(h.fx.bloomStrength).toBeLessThanOrEqual(bloom);
+    // 明滅の許可を 1 回も使っていない
+    for (let i = 0; i < 3; i++) expect(flashes.request(h.real)).toBe(true);
   });
 });
 

@@ -1,6 +1,38 @@
-import { settings, VOLUME_BGM, VOLUME_MASTER, VOLUME_SFX } from '../settings.ts';
+/** 効果音と BGM を鳴らすか */
+export type AudioSwitches = { sfx: boolean; bgm: boolean };
 
-/** sfx と bgm は silence() で消える。lead は silence() の影響を受けず、無音の中で鳴らす音に使う */
+/** 音量は控えめに固定する。細かい調整は端末の音量で行う */
+const VOLUME_MASTER = 0.45;
+const VOLUME_SFX = 0.9;
+const VOLUME_BGM = 0.7;
+/** 音量は知覚に合わせて 2 乗のカーブにする。オフは 0 */
+const MASTER_LEVEL = VOLUME_MASTER * VOLUME_MASTER;
+const sfxLevel = (s: Readonly<AudioSwitches>): number => (s.sfx ? VOLUME_SFX * VOLUME_SFX : 0);
+const bgmLevel = (s: Readonly<AudioSwitches>): number => (s.bgm ? VOLUME_BGM * VOLUME_BGM : 0);
+/** 切り替えで音量を寄せる時定数（秒） */
+const SWITCH_TAU = 0.02;
+/** 一時停止で全体の音量を下げきるまで（秒）。下げきってから AudioContext を止める */
+const PAUSE_FADE = 0.02;
+/** 一時停止を解いて全体の音量を戻すまで（秒） */
+const RESUME_FADE = 0.05;
+/** 下げきるのを待つ実時間の余裕（ms）。タイマーの遅れで、下げきる前に止めないように */
+const PAUSE_SUSPEND_MARGIN_MS = 30;
+
+/** 一定時間後に 1 回だけ呼ぶタイマー */
+export type DelayTimer = {
+  set(fn: () => void, ms: number): unknown;
+  clear(id: unknown): void;
+};
+
+const defaultDelay: DelayTimer = {
+  set: (fn, ms) => setTimeout(fn, ms),
+  clear: (id) => clearTimeout(id as ReturnType<typeof setTimeout>),
+};
+
+/**
+ * sfx と bgm は silence() で消える。lead は silence() の影響を受けず、無音の中で鳴らす音に使う。
+ * 共通の残響の出口は sfx のバスにつながっていて silence() で消えるので、lead の音は send() しない
+ */
 export type Bus = 'sfx' | 'bgm' | 'lead';
 
 /**
@@ -32,6 +64,10 @@ type AudioGraph = {
   readonly noise: AudioBuffer;
   /** BGM バスの入口。BGM 側で独自のフィルタを挟むために使う */
   readonly bgmInput: GainNode;
+  /** 効果音の共通の残響の入口。出口は効果音のバスにつながり、silence() で消える */
+  readonly reverb: AudioNode;
+  /** 歪みの曲線（WaveShaperNode.curve）。なだらかに頭を潰す */
+  readonly drive: Float32Array<ArrayBuffer>;
 };
 
 /** 1 つの音（複数のノードの束）。voice の出力 GainNode に音源をつなぐ */
@@ -40,6 +76,9 @@ export type Voice = {
   readonly ctx: AudioContext;
   /** AudioGraph.noise と同じもの */
   readonly noise: AudioBuffer;
+  /** AudioGraph.reverb と AudioGraph.drive と同じもの */
+  readonly reverb: AudioNode;
+  readonly drive: Float32Array<ArrayBuffer>;
   readonly out: GainNode;
   readonly start: number;
   readonly end: number;
@@ -48,13 +87,38 @@ export type Voice = {
   readonly sources: readonly AudioScheduledSourceNode[];
   /** 音源を登録する。voice を止めるときに一緒に止める */
   track(src: AudioScheduledSourceNode): void;
+  /**
+   * voice の外の、長く生きるノード（共通の残響など）へつなぐノードを登録する。
+   * 鳴り終わって後片付けするときに、出力と一緒に切り離す
+   */
+  own(node: AudioNode): void;
+  /** 今から fadeSeconds 秒でフェードアウトさせて止める */
+  stop(fadeSeconds: number): void;
 };
 
+/** 鳴らしている音を途中で止める口 */
+export type SoundHandle = { stop(): void };
+
+/** 鳴らせなかったときに返す、何もしない SoundHandle */
+export const NO_SOUND: SoundHandle = { stop: () => undefined };
+
+/** 鳴らしている音を途中で止めるときに、音量を下げきるまでの長さ（秒） */
+export const SOUND_STOP_FADE = 0.03;
+
+/** voice を SOUND_STOP_FADE 秒で下げきって止める SoundHandle */
+export const voiceHandle = (v: Voice): SoundHandle => ({ stop: () => v.stop(SOUND_STOP_FADE) });
+
 /** silence() の取り消し口 */
-type SilenceHandle = {
-  /** 無音をやめて、今すぐ元の音量へ戻す。後から別の silence() が始まっていれば何もしない */
+export type SilenceHandle = {
+  /**
+   * この無音をやめる。ほかの silence() の無音が続いていれば、それが終わるまで無音のまま。
+   * 元の音量へは DUCK_FADE 秒で戻す。2 回目以降の呼び出しは何もしない
+   */
   cancel(): void;
 };
+
+/** silence() の無音の区間（AudioContext の時刻）。start から下げ始め、end まで無音を保ち、fadeIn 秒で戻す */
+type SilenceWindow = { start: number; end: number; fadeIn: number };
 
 /** 同時に鳴らせる音の数。効果音と BGM で枠を分ける */
 const MAX_VOICES: Record<Bus, number> = { sfx: 24, bgm: 20, lead: 4 };
@@ -70,6 +134,8 @@ const PRIORITY_RANK: Record<VoicePriority, number> = { normal: 0, event: 1 };
 class VoiceState implements Voice {
   readonly ctx: AudioContext;
   readonly noise: AudioBuffer;
+  readonly reverb: AudioNode;
+  readonly drive: Float32Array<ArrayBuffer>;
   readonly out: GainNode;
   readonly start: number;
   end: number;
@@ -77,10 +143,13 @@ class VoiceState implements Voice {
   readonly rank: number;
   readonly group: VoiceGroup | null;
   readonly sources: AudioScheduledSourceNode[] = [];
+  private readonly owned: AudioNode[] = [];
 
   constructor(graph: AudioGraph, out: GainNode, start: number, end: number, priority: VoicePriority, group: VoiceGroup | null) {
     this.ctx = graph.ctx;
     this.noise = graph.noise;
+    this.reverb = graph.reverb;
+    this.drive = graph.drive;
     this.out = out;
     this.start = start;
     this.end = end;
@@ -92,23 +161,85 @@ class VoiceState implements Voice {
   track(src: AudioScheduledSourceNode): void {
     this.sources.push(src);
   }
+
+  own(node: AudioNode): void {
+    this.owned.push(node);
+  }
+
+  /** 鳴り終わった。出力と、外へつないだノードを切り離す */
+  retire(): void {
+    this.out.disconnect();
+    for (const node of this.owned) node.disconnect();
+  }
+
+  stop(fadeSeconds: number): void {
+    this.fadeOut(this.ctx.currentTime, Math.max(0.001, fadeSeconds));
+  }
+
+  /** now から fade 秒で音量を 0 へ下げ、音源を止める。鳴り終わる時刻（end）もそこまで早める */
+  fadeOut(now: number, fade: number): void {
+    const end = now + fade;
+    const g = this.out.gain;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(0, end);
+    for (const s of this.sources) {
+      try {
+        s.stop(end);
+      } catch {
+        // すでに止まった音源は無視する
+      }
+    }
+    if (this.end > end) this.end = end;
+  }
 }
 
 /** AudioContext と、そこに作ったバスの一式。AudioContext と同時にできる */
 type Graph = AudioGraph & {
-  /** 音量の設定 */
+  /** 全体の音量。一時停止で下げる */
   readonly master: GainNode;
   /** silence() で下げる */
   readonly duck: GainNode;
   readonly buses: Readonly<Record<Bus, GainNode>>;
 };
 
+/** 残響の長さ（秒）と、響きが -60 dB まで減衰するまでの長さの目安 */
+const REVERB_SECONDS = 1.8;
+/** 残響の出口の音量 */
+const REVERB_LEVEL = 0.55;
+/** 歪みの曲線の細かさと、潰す強さ */
+const DRIVE_SAMPLES = 2048;
+const DRIVE_AMOUNT = 3;
+
+/** xorshift の乱数で -1〜1 の値を data に書く。seed から決まった列にする */
+function fillNoise(data: Float32Array, seed0: number, decay: (i: number) => number): void {
+  let seed = seed0;
+  for (let i = 0; i < data.length; i++) {
+    seed ^= seed << 13;
+    seed ^= seed >>> 17;
+    seed ^= seed << 5;
+    data[i] = (((seed >>> 0) / 4294967296) * 2 - 1) * decay(i);
+  }
+}
+
+/** なだらかに頭を潰す歪みの曲線（tanh を、端の出力が ±1 になるよう割る） */
+function driveCurve(): Float32Array<ArrayBuffer> {
+  const curve = new Float32Array(DRIVE_SAMPLES);
+  const norm = Math.tanh(DRIVE_AMOUNT);
+  for (let i = 0; i < DRIVE_SAMPLES; i++) {
+    const x = (i * 2) / (DRIVE_SAMPLES - 1) - 1;
+    curve[i] = Math.tanh(DRIVE_AMOUNT * x) / norm;
+  }
+  return curve;
+}
+
 /**
- * バスとノイズを作る。
+ * バス・ノイズ・残響・歪みの曲線を作る。バスの音量は switches から決めた値で作る。
  * 経路: voice → (sfx | bgm) → duck → master → compressor → destination
  *       voice → lead → master（duck を通らない）
+ *       voice の送り → reverb（ConvolverNode）→ sfx
  */
-function buildGraph(ctx: AudioContext): Graph {
+function buildGraph(ctx: AudioContext, switches: Readonly<AudioSwitches>, masterLevel: number): Graph {
   const compressor = ctx.createDynamicsCompressor();
   compressor.threshold.value = -14;
   compressor.knee.value = 10;
@@ -127,41 +258,46 @@ function buildGraph(ctx: AudioContext): Graph {
   bgm.connect(duck);
   const lead = ctx.createGain();
   lead.connect(master);
+  master.gain.value = masterLevel;
+  sfx.gain.value = sfxLevel(switches);
+  lead.gain.value = sfxLevel(switches);
+  bgm.gain.value = bgmLevel(switches);
 
   const len = Math.floor(ctx.sampleRate * 1.5);
   const noise = ctx.createBuffer(1, len, ctx.sampleRate);
-  const data = noise.getChannelData(0);
-  let seed = 0x2f6b1a3d;
-  for (let i = 0; i < len; i++) {
-    seed ^= seed << 13;
-    seed ^= seed >>> 17;
-    seed ^= seed << 5;
-    data[i] = ((seed >>> 0) / 4294967296) * 2 - 1;
-  }
-  return { ctx, noise, bgmInput: bgm, master, duck, buses: { sfx, bgm, lead } };
+  fillNoise(noise.getChannelData(0), 0x2f6b1a3d, () => 1);
+
+  // 残響: 左右で別のノイズを指数的に減衰させたインパルス応答
+  const irLen = Math.floor(ctx.sampleRate * REVERB_SECONDS);
+  const ir = ctx.createBuffer(2, irLen, ctx.sampleRate);
+  const k = Math.log(1000) / irLen;
+  fillNoise(ir.getChannelData(0), 0x5a17c3e9, (i) => Math.exp(-k * i));
+  fillNoise(ir.getChannelData(1), 0x1d2c9b47, (i) => Math.exp(-k * i));
+  const convolver = ctx.createConvolver();
+  convolver.buffer = ir;
+  const reverbOut = ctx.createGain();
+  reverbOut.gain.value = REVERB_LEVEL;
+  convolver.connect(reverbOut);
+  reverbOut.connect(sfx);
+
+  return { ctx, noise, bgmInput: bgm, reverb: convolver, drive: driveCurve(), master, duck, buses: { sfx, bgm, lead } };
 }
 
 /**
- * 音のまとまり。1 回のプレイが鳴らす音をまとめておき、プレイを捨てるときに残響ごと止める。
+ * 音のまとまり。1 回のプレイが鳴らす音をまとめておき、プレイを捨てるときにまとめて止める。
+ * 止まるのはまとまりの音と、その音から共通の残響への送りまで。共通の残響にすでに入った響きは鳴り終わるまで残る。
  * AudioEngine.createGroup() で作る。
  */
 export class VoiceGroup {
   private readonly stopFn: (group: VoiceGroup, fadeSeconds: number) => void;
-  private readonly sizeFn: (group: VoiceGroup) => number;
 
-  constructor(stop: (group: VoiceGroup, fadeSeconds: number) => void, size: (group: VoiceGroup) => number) {
+  constructor(stop: (group: VoiceGroup, fadeSeconds: number) => void) {
     this.stopFn = stop;
-    this.sizeFn = size;
   }
 
   /** このまとまりの音を fadeSeconds 秒でフェードアウトさせて止める。まだ鳴り始めていない予約も鳴らさない */
   stopAll(fadeSeconds: number): void {
     this.stopFn(this, fadeSeconds);
-  }
-
-  /** 鳴っている（または予約されている）音の数 */
-  get size(): number {
-    return this.sizeFn(this);
   }
 }
 
@@ -185,6 +321,10 @@ function defaultContext(): AudioContext | null {
  * ページがまだユーザー操作を受けていなければ、作った AudioContext は止まった（suspended）状態のままになり、
  * ユーザー操作（pointerup / touchend / keydown）のハンドラの中で unlock() を呼ぶと動き出す。
  * すでに操作を受けたページでは、ブラウザが作ってすぐ動かすこともある。こちらから再開するのは unlock() の後だけ。
+ *
+ * ゲームの一時停止は setPaused() で伝える。止めている間は AudioContext ごと止めるので、鳴っている効果音も、
+ * 無音の予定も、残響の尾も、その位置で止まり、解くとその位置から続く。止めている間は、画面が見えるようになっても、
+ * ユーザー操作があっても、unlock() を呼んでも動かさない。
  */
 export class AudioEngine {
   private built: Graph | null = null;
@@ -193,21 +333,42 @@ export class AudioEngine {
   private readonly voices: Record<Bus, VoiceState[]> = { sfx: [], bgm: [], lead: [] };
   /** 奪われたり止められたりして、フェードアウト中の音。枠は数えない */
   private readonly releasing: VoiceState[] = [];
-  private silenceId = 0;
+  /** 終わっていない silence() の区間 */
+  private silences: SilenceWindow[] = [];
+  /**
+   * duck の音量の予定。時刻と値の点を直線でつないだもので、最初の点より前は最初の値、最後の点より後は最後の値。
+   * 予定を組み直すときは、ここから今の音量を求める
+   */
+  private duckTimes: number[] = [0];
+  private duckValues: number[] = [1];
   private needsResume = false;
   private hidden = false;
+  /** ゲームの一時停止 */
+  private paused = false;
+  private readonly delay: DelayTimer;
+  /** 一時停止で、下げきってから AudioContext を止めるタイマー */
+  private suspendTimer: unknown = null;
+  /** 全体の音量の、最後に組んだ変化（AudioContext の時刻 t0 に from、t1 に to で、その間は直線） */
+  private masterFrom = MASTER_LEVEL;
+  private masterTo = MASTER_LEVEL;
+  private masterT0 = 0;
+  private masterT1 = 0;
+  private readonly switches: AudioSwitches = { sfx: true, bgm: true };
   private readonly fallbackOrigin = typeof performance !== 'undefined' ? performance.now() : 0;
 
-  /** @param createContext AudioContext を作る。作れない環境では null を返す */
-  constructor(createContext: () => AudioContext | null = defaultContext) {
+  /**
+   * @param createContext AudioContext を作る。作れない環境では null を返す
+   * @param delay 一時停止で、音量を下げきってから AudioContext を止めるのに使うタイマー
+   */
+  constructor(createContext: () => AudioContext | null = defaultContext, delay: DelayTimer = defaultDelay) {
     this.createContext = createContext;
+    this.delay = delay;
     if (typeof window === 'undefined') return;
-    settings.subscribe(() => this.applySettings());
     document.addEventListener('visibilitychange', this.onVisibility);
     // 中断（通話など）や復帰に失敗したあとは、次のユーザー操作で再開を試みる
     const retry = () => {
       const ctx = this.built?.ctx;
-      if (this.needsResume || (ctx && ctx.state !== 'running' && !this.hidden)) void this.resume();
+      if (this.needsResume || (ctx && ctx.state !== 'running' && !this.hidden && !this.paused)) void this.resume();
     };
     window.addEventListener('pointerup', retry, true);
     window.addEventListener('touchend', retry, true);
@@ -257,7 +418,7 @@ export class AudioEngine {
   }
 
   createGroup(): VoiceGroup {
-    return new VoiceGroup(this.stopGroup, this.groupSize);
+    return new VoiceGroup(this.stopGroup);
   }
 
   /**
@@ -300,61 +461,182 @@ export class AudioEngine {
   }
 
   /**
-   * 効果音と BGM を duration 秒だけ無音にしてから fadeIn 秒で戻す。lead の音だけが聞こえる状態になる。
+   * 今から delay 秒後に、効果音と BGM を duration 秒だけ無音にしてから fadeIn 秒で戻す。lead の音だけが聞こえる状態になる。
+   * 下げきるまでに DUCK_FADE 秒かかるので、それより短い duration は DUCK_FADE として扱う（どの長さでも必ず元の音量へ戻る）。
+   * 無音の区間は重ねてよく、どれかの区間の中にいる間は無音を保つ。後の呼び出しが前の無音を縮めることはない
    */
-  silence(duration: number, fadeIn = 0.02): SilenceHandle {
+  silence(duration: number, fadeIn = 0.02, delay = 0): SilenceHandle {
     const graph = this.built;
     if (!graph) return NOOP_SILENCE;
-    const ctx = graph.ctx;
-    const t = ctx.currentTime;
-    const g = graph.duck.gain;
-    g.cancelScheduledValues(t);
-    g.setValueAtTime(g.value, t);
-    g.linearRampToValueAtTime(0, t + DUCK_FADE);
-    g.setValueAtTime(0, t + duration);
-    g.linearRampToValueAtTime(1, t + duration + fadeIn);
-    const id = ++this.silenceId;
+    const start = graph.ctx.currentTime + Math.max(0, delay);
+    const w: SilenceWindow = { start, end: start + Math.max(DUCK_FADE, duration), fadeIn: Math.max(0.001, fadeIn) };
+    this.silences.push(w);
+    this.scheduleDuck(graph);
+    let active = true;
     return {
       cancel: () => {
-        if (id !== this.silenceId) return;
-        const now = ctx.currentTime;
-        g.cancelScheduledValues(now);
-        g.setValueAtTime(1, now);
+        if (!active) return;
+        active = false;
+        const i = this.silences.indexOf(w);
+        if (i < 0) return;
+        this.silences.splice(i, 1);
+        this.scheduleDuck(graph);
       },
     };
   }
 
-  /** AudioContext とバスを作る。作れない環境では null */
+  /** 時刻 t の duck の音量を、組んである予定から求める */
+  private duckAt(t: number): number {
+    const ts = this.duckTimes;
+    const vs = this.duckValues;
+    if (t <= ts[0]) return vs[0];
+    for (let i = 1; i < ts.length; i++) {
+      if (t < ts[i]) return vs[i - 1] + ((vs[i] - vs[i - 1]) * (t - ts[i - 1])) / (ts[i] - ts[i - 1]);
+    }
+    return vs[vs.length - 1];
+  }
+
+  /**
+   * 終わっていない無音の区間をすべて合わせて、duck の予定を今から組み直す。
+   * 今の音量から始め、区間ごとに DUCK_FADE 秒で下げ、区間の終わりまで保ち、fadeIn 秒で戻す。
+   * 重なる区間（戻りきる前に次が始まるものを含む）は 1 つにまとめ、いちばん遅く終わる区間の fadeIn で戻す。
+   * 区間の外にいるのに下がっているときは、DUCK_FADE 秒で元の音量へ戻す
+   */
+  private scheduleDuck(graph: Graph): void {
+    const now = graph.ctx.currentTime;
+    const level = this.duckAt(now);
+    const live = this.silences.filter((w) => w.end + w.fadeIn > now).sort((a, b) => a.start - b.start);
+    this.silences = live;
+    const merged: SilenceWindow[] = [];
+    for (const w of live) {
+      const last = merged.at(-1);
+      if (last && w.start <= last.end + last.fadeIn) {
+        if (w.end > last.end || (w.end === last.end && w.fadeIn > last.fadeIn)) {
+          last.end = w.end;
+          last.fadeIn = w.fadeIn;
+        }
+      } else {
+        merged.push({ ...w });
+      }
+    }
+
+    const ts = [now];
+    const vs = [level];
+    let at = now;
+    let v = level;
+    const to = (time: number, value: number) => {
+      ts.push(time);
+      vs.push(value);
+      at = time;
+      v = value;
+    };
+    for (const w of merged) {
+      if (now >= w.end) {
+        // 戻っている途中: 残りの時間で戻しきる
+        to(w.end + w.fadeIn, 1);
+        continue;
+      }
+      if (w.start > at) {
+        if (v < 1 && at + DUCK_FADE <= w.start) to(at + DUCK_FADE, 1);
+        if (w.start > at) to(w.start, v);
+      }
+      to(at + DUCK_FADE, 0);
+      if (w.end > at) to(w.end, 0);
+      to(at + w.fadeIn, 1);
+    }
+    if (v < 1) to(at + DUCK_FADE, 1);
+    this.duckTimes = ts;
+    this.duckValues = vs;
+
+    const g = graph.duck.gain;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(level, now);
+    for (let i = 1; i < ts.length; i++) g.linearRampToValueAtTime(vs[i], ts[i]);
+  }
+
+  /** AudioContext とバスを作る。作れない環境では null。一時停止中なら、全体の音量を 0 にして止めておく */
   private ensureGraph(): Graph | null {
     if (this.built) return this.built;
     const ctx = this.createContext();
     if (!ctx) return null;
-    const graph = buildGraph(ctx);
+    const level = this.paused ? 0 : MASTER_LEVEL;
+    const graph = buildGraph(ctx, this.switches, level);
     this.built = graph;
+    this.masterFrom = this.masterTo = level;
+    this.masterT0 = this.masterT1 = ctx.currentTime;
     ctx.addEventListener('statechange', () => {
-      if (ctx.state !== 'running' && !this.hidden) this.needsResume = true;
+      if (ctx.state !== 'running' && !this.hidden && !this.paused) this.needsResume = true;
     });
-    this.applySettings();
+    if (this.paused) void ctx.suspend().catch(() => undefined);
     return graph;
+  }
+
+  /**
+   * ゲームの一時停止。止めるときは全体の音量を PAUSE_FADE 秒で下げきってから AudioContext を止め、
+   * 解くときは AudioContext を動かして RESUME_FADE 秒で元の音量へ戻す。下げている途中で解いたら、止めずにその音量から戻す
+   */
+  setPaused(paused: boolean): void {
+    if (this.paused === paused) return;
+    this.paused = paused;
+    this.delay.clear(this.suspendTimer);
+    this.suspendTimer = null;
+    const g = this.built;
+    if (!g) return;
+    if (paused) {
+      this.rampMaster(g, 0, PAUSE_FADE);
+      this.suspendTimer = this.delay.set(() => {
+        this.suspendTimer = null;
+        if (this.paused) void g.ctx.suspend().catch(() => undefined);
+      }, PAUSE_FADE * 1000 + PAUSE_SUSPEND_MARGIN_MS);
+    } else {
+      this.rampMaster(g, MASTER_LEVEL, RESUME_FADE);
+      void this.resume();
+    }
+  }
+
+  /** 全体の音量を、今の音量から seconds 秒で level へ直線で動かす */
+  private rampMaster(g: Graph, level: number, seconds: number): void {
+    const now = g.ctx.currentTime;
+    const from = this.masterAt(now);
+    const p = g.master.gain;
+    p.cancelScheduledValues(now);
+    p.setValueAtTime(from, now);
+    p.linearRampToValueAtTime(level, now + seconds);
+    this.masterFrom = from;
+    this.masterTo = level;
+    this.masterT0 = now;
+    this.masterT1 = now + seconds;
+  }
+
+  /** 時刻 t の全体の音量を、組んである変化から求める */
+  private masterAt(t: number): number {
+    if (t <= this.masterT0) return this.masterFrom;
+    if (t >= this.masterT1) return this.masterTo;
+    return this.masterFrom + ((this.masterTo - this.masterFrom) * (t - this.masterT0)) / (this.masterT1 - this.masterT0);
+  }
+
+  /** 効果音と BGM を鳴らすか。開いているゲームの設定から渡す */
+  setEnabled(switches: Readonly<AudioSwitches>): void {
+    if (this.switches.sfx === switches.sfx && this.switches.bgm === switches.bgm) return;
+    this.switches.sfx = switches.sfx;
+    this.switches.bgm = switches.bgm;
+    this.applySettings();
   }
 
   private applySettings(): void {
     const g = this.built;
     if (!g) return;
-    const s = settings.get();
+    const s = this.switches;
     const t = g.ctx.currentTime;
-    // 音量は知覚に合わせて 2 乗のカーブにする。オフは 0
-    const sfx = s.sfx ? VOLUME_SFX * VOLUME_SFX : 0;
-    g.master.gain.setTargetAtTime(VOLUME_MASTER * VOLUME_MASTER, t, 0.02);
-    g.buses.sfx.gain.setTargetAtTime(sfx, t, 0.02);
-    g.buses.bgm.gain.setTargetAtTime(s.bgm ? VOLUME_BGM * VOLUME_BGM : 0, t, 0.02);
-    g.buses.lead.gain.setTargetAtTime(sfx, t, 0.02);
+    g.buses.sfx.gain.setTargetAtTime(sfxLevel(s), t, SWITCH_TAU);
+    g.buses.bgm.gain.setTargetAtTime(bgmLevel(s), t, SWITCH_TAU);
+    g.buses.lead.gain.setTargetAtTime(sfxLevel(s), t, SWITCH_TAU);
   }
 
-  /** unlock() を呼んだ後だけ動かす。それまではユーザー操作の外で動き出さないようにする */
+  /** unlock() を呼んだ後だけ動かす。それまではユーザー操作の外で動き出さないようにする。一時停止中は動かさない */
   private async resume(): Promise<void> {
     const ctx = this.built?.ctx;
-    if (!ctx || this.hidden || !this.unlocked) return;
+    if (!ctx || this.hidden || !this.unlocked || this.paused) return;
     try {
       await ctx.resume();
       this.needsResume = ctx.state !== 'running';
@@ -388,19 +670,7 @@ export class AudioEngine {
   }
 
   private release(v: VoiceState, now: number, fade: number): void {
-    const end = now + fade;
-    const g = v.out.gain;
-    g.cancelScheduledValues(now);
-    g.setValueAtTime(g.value, now);
-    g.linearRampToValueAtTime(0, end);
-    for (const s of v.sources) {
-      try {
-        s.stop(end);
-      } catch {
-        // すでに止まった音源は無視する
-      }
-    }
-    if (v.end > end) v.end = end;
+    v.fadeOut(now, fade);
     this.releasing.push(v);
   }
 
@@ -421,13 +691,6 @@ export class AudioEngine {
     }
   };
 
-  private readonly groupSize = (group: VoiceGroup): number => {
-    let n = 0;
-    for (const bus of BUSES) {
-      for (const v of this.voices[bus]) if (v.group === group) n++;
-    }
-    return n;
-  };
 }
 
 const BUSES: readonly Bus[] = ['sfx', 'bgm', 'lead'];
@@ -437,7 +700,7 @@ function reapPool(pool: VoiceState[], now: number): void {
   let w = 0;
   for (let r = 0; r < pool.length; r++) {
     const v = pool[r];
-    if (v.end + REAP_MARGIN < now) v.out.disconnect();
+    if (v.end + REAP_MARGIN < now) v.retire();
     else pool[w++] = v;
   }
   pool.length = w;

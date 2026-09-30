@@ -1,3 +1,5 @@
+import { Fragment } from 'react';
+import { NOT_FOUND_TITLE_PARTS } from './site.ts';
 import Link from './ui/Link.tsx';
 import Overlay from './ui/Overlay.tsx';
 
@@ -8,7 +10,12 @@ export default function NotFound() {
       <Overlay tone="solid">
         <main className="panel not-found">
           <h1 className="panel-title">
-            ページが<wbr />見つかりません
+            {NOT_FOUND_TITLE_PARTS.map((part, i) => (
+              <Fragment key={part}>
+                {i > 0 && <wbr />}
+                {part}
+              </Fragment>
+            ))}
           </h1>
           <p className="panel-message">
             URL を<wbr />もう一度<wbr />確かめてください。

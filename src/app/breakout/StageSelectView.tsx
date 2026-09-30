@@ -1,5 +1,5 @@
-import { selectableStages } from '../../games/breakout/records.ts';
-import type { Records } from '../../games/breakout/records.ts';
+import { selectableStages } from '../../games/breakout/records-model.ts';
+import type { Records } from '../../games/breakout/records-model.ts';
 import { STAGES, isMilestoneStage } from '../../games/breakout/stages/stages.ts';
 import Overlay from '../ui/Overlay.tsx';
 

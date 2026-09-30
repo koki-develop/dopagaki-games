@@ -73,8 +73,4 @@ export class BallStore implements ReadonlyBallStore {
       this.py[i] = this.y[i];
     }
   }
-
-  clear(): void {
-    this.count = 0;
-  }
 }

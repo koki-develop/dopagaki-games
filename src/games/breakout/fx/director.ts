@@ -1,8 +1,9 @@
+import type { ParticleSink } from '../../../engine/particle-spec.ts';
 import type { CameraRig } from '../../../juice/camera.ts';
 import type { FlashLimiter } from '../../../juice/flash.ts';
+import type { FrameTime } from '../../../juice/frame-time.ts';
 import type { WorldClock } from '../../../juice/time.ts';
-import { FIELD_H, FIELD_W, STEP_DT } from '../config.ts';
-import type { FrameTime } from '../frame-time.ts';
+import { STEP_DT } from '../config.ts';
 import { EventKind, Signal } from '../sim/events.ts';
 import type { Sim } from '../sim/sim.ts';
 import type { HudState } from '../types.ts';
@@ -14,14 +15,13 @@ import type { BgmPort } from './atmosphere.ts';
 import type { DebrisSink } from './debris.ts';
 import { Finale } from './finale.ts';
 import type { FinaleAudio } from './finale.ts';
-import type { FxState } from './fx-state.ts';
 import { createWallHits, WALL_HIT_SLOTS } from './fx-state.ts';
+import type { FxState } from './fx-state.ts';
 import { GameOver } from './game-over.ts';
 import { IntensityMeter } from './intensity.ts';
+import { ParticleFx } from './particle-fx.ts';
 import { NEW_BEST_PEAK_LEVEL, NewBest, playPeak } from './peak.ts';
 import type { PeakDeps } from './peak.ts';
-import { ParticleFx } from './particle-fx.ts';
-import type { ParticleSink } from './particle-fx.ts';
 import { Shockwave } from './shockwave.ts';
 import { SoundDirector } from './sound-director.ts';
 import type { SfxPort } from './sound-director.ts';
@@ -34,7 +34,7 @@ import { TierTracker } from './tiers.ts';
 const REAL_LONG_AGO = -1e9;
 
 /** 奈落に落ちたボールを描く先。時刻 at（present の時間軸）に位置 (x, y) にあり、速度 (vx, vy) で進む */
-export type FallenBallSink = { emit(at: number, x: number, y: number, vx: number, vy: number): void };
+type FallenBallSink = { emit(at: number, x: number, y: number, vx: number, vy: number): void };
 
 export type DirectorPorts = {
   /** 1 回のプレイの効果音（プレイの VoiceGroup に属する） */
@@ -265,7 +265,7 @@ export class Director {
       const y = sim.blocks.lowestLiveBlockBottom();
       if (Number.isFinite(y)) particles.slamDust(now, y);
     }
-    if (this.state === 'live' && sim.phase !== 'playing') this.beginEnding(ft, budget, signals);
+    if (this.state === 'live' && sim.phase !== 'playing') this.beginEnding(ft, budget);
 
     if (this.newBest.check(sim.score, sim.phase === 'playing')) playPeak(NEW_BEST_PEAK_LEVEL, ft.real, this.peakDeps);
 
@@ -288,14 +288,15 @@ export class Director {
     fx.paddleFlash = Math.exp(-pt * 16) * this.paddleHitStrength;
   }
 
-  /** 勝敗が決まった。大量に起きる音を止め、ステージクリアならフィナーレを、そうでなければゲームオーバーを始める */
-  private beginEnding(ft: FrameTime, budget: number, signals: number): void {
+  /**
+   * 勝敗が決まった。大量に起きる音を止め、ステージクリアならフィナーレを、そうでなければゲームオーバーを始める。
+   * sim の phase は StageClear の知らせと同じステップで変わり、演出は毎フレーム読むので、クリアの位置はこのフレームの集計にある
+   */
+  private beginEnding(ft: FrameTime, budget: number): void {
     this.state = 'ending';
     this.sounds.quiesce();
     if (this.sim.phase === 'cleared') {
-      const s = this.summary;
-      const at = (signals & Signal.StageClear) !== 0;
-      this.finale.start(ft, at ? s.clearX : FIELD_W / 2, at ? s.clearY : FIELD_H / 2);
+      this.finale.start(ft, this.summary.clearX, this.summary.clearY);
     } else {
       this.gameOver.start(ft, budget);
     }

@@ -3,7 +3,7 @@ import { uniform, uniformArray } from 'three/tsl';
 import { createWallHits, PRESENT_LONG_AGO, SHOCK_SPEED_IDLE, WALL_HIT_SLOTS } from '../fx/fx-state.ts';
 
 /**
- * 全シェーダーで共有する uniform。値を書くのは BreakoutView.apply だけで、演出の状態（FxState）を毎フレームそのまま写す。
+ * 全シェーダーで共有する uniform。値を書くのは BreakoutView.apply だけで、演出の状態（FxState）と設定から決まる倍率を毎フレーム写す。
  * 時間は present の時間軸（FrameTime.present）なので、世界が止まればアニメーションも止まる。
  * 作ったときの値は、何も起きていない状態（衝撃波や壁の揺れの開始時刻が十分な過去）にしておく。
  */
@@ -32,6 +32,8 @@ export function createViewUniforms() {
     inhale: uniform(0),
     /** 画面の縁から focus へ向かって暗く絞り込む強さ（0〜1） */
     vignette: uniform(0),
+    /** 衝撃に伴う画面上の効果の倍率（CameraMotion.jolt）。ブロックの揺れと、当たったときの震えに掛ける */
+    jolt: uniform(1),
     /** 衝撃波: 中心 x, y、開始時刻、速さ */
     shock: uniform(new THREE.Vector4(0, 0, PRESENT_LONG_AGO, SHOCK_SPEED_IDLE)),
     /** ステージクリアの溜めで、すべてが吸い込まれていく点 */

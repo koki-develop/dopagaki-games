@@ -5,17 +5,9 @@ import type { Plugin } from 'vite';
 import { renderDocument } from './head.ts';
 import { generateSite, NOT_FOUND_FILE } from './generate.ts';
 import type { Site } from './generate.ts';
-import { resolvePage } from './resolve.ts';
+import { isPageRequest, resolvePage } from './resolve.ts';
 
 const HTML = 'text/html; charset=utf-8';
-
-/** ページを開くリクエストか。スクリプトや画像の読み込みはブラウザが Accept に text/html を入れないので、ここで分けられる */
-function isPageRequest(req: IncomingMessage, pathname: string): boolean {
-  if (req.method !== 'GET' && req.method !== 'HEAD') return false;
-  if (!req.headers.accept?.includes('text/html')) return false;
-  const last = pathname.slice(pathname.lastIndexOf('/') + 1);
-  return !last.includes('.') || last.endsWith('.html');
-}
 
 function send(req: IncomingMessage, res: ServerResponse, status: number, contentType: string, body: Buffer | string): void {
   res.statusCode = status;
@@ -58,7 +50,7 @@ export function sitePlugin(): Plugin {
           const s = await getSite();
           const file = s.files.find((f) => f.path === url.pathname);
           if (file) return send(req, res, 200, file.contentType, file.body);
-          if (!isPageRequest(req, url.pathname)) return next();
+          if (!isPageRequest(req.method, req.headers.accept, url.pathname)) return next();
 
           const r = resolvePage(url.pathname, url.search);
           if (r.kind === 'redirect') return redirect(res, r.location);
@@ -75,7 +67,7 @@ export function sitePlugin(): Plugin {
       const outDir = resolve(server.config.root, server.config.build.outDir);
       server.middlewares.use((req, res, next) => {
         const url = requestUrl(req);
-        if (!isPageRequest(req, url.pathname)) return next();
+        if (!isPageRequest(req.method, req.headers.accept, url.pathname)) return next();
         const r = resolvePage(url.pathname, url.search);
         if (r.kind === 'redirect') return redirect(res, r.location);
         if (r.status === 200) return next();

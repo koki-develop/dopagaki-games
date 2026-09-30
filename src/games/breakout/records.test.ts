@@ -1,50 +1,16 @@
 import { describe, expect, test } from 'bun:test';
+import { memoryStorage, sharedTabs } from '../../juice/storage.test-support.ts';
 import type { StorageLike } from '../../juice/storage.ts';
-import {
-  applyResult,
-  createRecordsStore,
-  emptyRecords,
-  mergeRecords,
-  RECORDS_KEY,
-  sanitizeRecords,
-  selectableStages,
-} from './records.ts';
-import type { StorageEventSource } from './records.ts';
+import { applyResult, emptyRecords, mergeRecords, sanitizeRecords, selectableStages } from './records-model.ts';
+import { createRecordsStore, RECORDS_KEY } from './records.ts';
 import type { RunResult } from './types.ts';
 
 const IDS = ['warmup', 'stripes', 'checker', 'pyramid', 'deluge'] as const;
 
-type Mem = StorageLike & { mem: Map<string, string> };
-
-const memoryStorage = (init: Record<string, string> = {}, mem = new Map(Object.entries(init))): Mem => ({
-  mem,
-  getItem: (k) => mem.get(k) ?? null,
-  setItem: (k, v) => {
-    mem.set(k, v);
-  },
-});
-
-/** 同じ保存先を共有する別のタブ。保存すると、ほかのタブへ `storage` イベントを送る */
+/** 同じ保存先を共有する別のタブの記録 */
 const tabs = () => {
-  const mem = new Map<string, string>();
-  const all: { listeners: Set<(e: { key: string | null }) => void> }[] = [];
-  const open = () => {
-    const self = { listeners: new Set<(e: { key: string | null }) => void>() };
-    all.push(self);
-    const events: StorageEventSource = {
-      addEventListener: (_, l) => void self.listeners.add(l),
-      removeEventListener: (_, l) => void self.listeners.delete(l),
-    };
-    const storage: StorageLike = {
-      getItem: (k) => mem.get(k) ?? null,
-      setItem: (k, v) => {
-        mem.set(k, v);
-        for (const t of all) if (t !== self) for (const l of t.listeners) l({ key: k });
-      },
-    };
-    return createRecordsStore({ storage, stageIds: IDS, events });
-  };
-  return { mem, open };
+  const shared = sharedTabs();
+  return { mem: shared.mem, open: () => createRecordsStore({ ...shared.open(), stageIds: IDS }) };
 };
 
 const result = (mode: RunResult['mode'], score: number, cleared = false): RunResult => ({ mode, score, cleared, previousBest: 0, newBest: false });

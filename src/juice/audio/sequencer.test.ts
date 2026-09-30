@@ -103,13 +103,47 @@ describe('Sequencer', () => {
     for (let i = 1; i < after.length; i++) expect(after[i].time - after[i - 1].time).toBeCloseTo(seq.stepDuration, 9);
   });
 
+  test('時計が動いていない間はステップを進めず、動き出したらそのステップから鳴らす', () => {
+    const { clock, timer, seq, steps, run } = setup();
+    clock.running = false;
+    seq.start();
+    timer.fire();
+    clock.t += 1;
+    timer.fire();
+    expect(steps).toEqual([]);
+    clock.running = true;
+    run(0.5);
+    expect(steps[0].step).toBe(0);
+    for (const s of steps) expect(s.time).toBeGreaterThanOrEqual(s.now);
+  });
+
+  test('鳴らしている途中で時計が止まったら、止まった位置から同じ間合いで続ける', () => {
+    const { clock, timer, seq, steps, run } = setup();
+    seq.start();
+    run(1);
+    const last = steps.at(-1)!;
+    const beat = seq.beatPosition();
+    // AudioContext が止まると、その時刻のまま進まない
+    clock.running = false;
+    timer.fire();
+    const count = steps.length;
+    timer.fire();
+    expect(steps.length).toBe(count);
+    expect(seq.beatPosition()).toBeCloseTo(beat, 9);
+    clock.running = true;
+    run(0.5);
+    const next = steps[count];
+    expect(next.step).toBe(last.step + 1);
+    expect(next.time - last.time).toBeCloseTo(seq.stepDuration, 9);
+  });
+
   test('止めている間は beatPosition() が止まり、再開してもつながる', () => {
     const { clock, seq, steps, run } = setup();
     seq.start();
     run(1.013);
     const atStop = seq.beatPosition();
     seq.stop();
-    const stepAtStop = seq.upcomingStep;
+    const stepAtStop = steps[steps.length - 1].step + 1;
     clock.t += 7;
     expect(seq.beatPosition()).toBeCloseTo(atStop, 9);
     seq.start();
@@ -134,6 +168,8 @@ describe('Sequencer', () => {
     expect(after[0].time).toBeGreaterThanOrEqual(clock.t - 0.05);
     seq.stop();
     seq.reset();
-    expect(seq.upcomingStep).toBe(0);
+    const stopped = steps.length;
+    seq.start();
+    expect(steps[stopped].step).toBe(0);
   });
 });

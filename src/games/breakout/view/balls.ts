@@ -1,17 +1,17 @@
-import * as THREE from 'three/webgpu';
 import { abs, exp, float, floor, Fn, max, mix, positionLocal, select, smoothstep, step, uniform, uv, vec2, vec3, vec4 } from 'three/tsl';
+import * as THREE from 'three/webgpu';
 import type { Node } from 'three/webgpu';
-import { BALL_CAP, BALL_RADIUS, FIELD_W } from '../config.ts';
 import { InstanceBuffer, InstanceRing, unitQuad } from '../../../engine/instanced.ts';
 import { drawCount } from '../../../engine/ring.ts';
-import { neon, sdSegment } from './tsl.ts';
+import { neon, sdSegment } from '../../../engine/tsl.ts';
+import { BALL_CAP, BALL_RADIUS, FIELD_W } from '../config.ts';
 import { LOOK } from './look.ts';
 import type { ViewUniforms } from './uniforms.ts';
 
 const R = BALL_RADIUS;
 
 /** ボールの位置の読み取り口。p* は前の固定ステップ、x / y は今の固定ステップの位置 */
-export type BallSource = {
+type BallSource = {
   readonly count: number;
   readonly px: ArrayLike<number>;
   readonly py: ArrayLike<number>;
@@ -68,7 +68,8 @@ function ballMaterial(u: ViewUniforms, look: BallLook, center: Node<'vec2'>, mot
     const p = vec2(q.x.mul(halfLen), q.y.mul(halfWid));
     const d = sdSegment(p, vec2(stretch.negate(), 0), vec2(stretch, 0));
     const core = smoothstep(R * 0.95, R * 0.55, d);
-    const halo = exp(d.div(R).pow(2).mul(-1.6));
+    const dr = d.div(R);
+    const halo = exp(dr.mul(dr).mul(-1.6));
     const tint = neon(u.hue.div(6.28318).add(0.5));
     const col = vec3(1, 1.04, 1.1).mul(LOOK.ball.core).mul(core).add(tint.mul(halo).mul(LOOK.ball.halo));
     return vec4(col.mul(float(0.85).add(u.intensity.mul(0.25))).mul(look.brightness), 1);

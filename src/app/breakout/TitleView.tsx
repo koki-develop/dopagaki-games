@@ -1,5 +1,5 @@
-import type { Records } from '../../games/breakout/records.ts';
-import { formatScore } from '../../games/breakout/hud/format.ts';
+import type { Records } from '../../games/breakout/records-model.ts';
+import { formatScore } from '../../shared/format.ts';
 import { STAGES } from '../../games/breakout/stages/stages.ts';
 import Link from '../ui/Link.tsx';
 import Overlay from '../ui/Overlay.tsx';

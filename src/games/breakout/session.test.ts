@@ -1,11 +1,13 @@
 import { describe, expect, test } from 'bun:test';
+import type { GraphicsEvents } from '../../engine/render-driver.ts';
 import { AudioEngine } from '../../juice/audio/engine.ts';
 import { snapshotTuning } from './config.ts';
 import { debugHooksOf, startGameSession } from './session.ts';
-import type { BreakoutDebugHooks, GraphicsEvents, InputHandlers, SessionEnv, SessionGraphics, SessionInput } from './session.ts';
+import type { BreakoutDebugHooks, InputHandlers, SessionEnv, SessionGraphics, SessionInput } from './session.ts';
 import type { StageDef } from './sim/stage-parse.ts';
 import { STAGES } from './stages/stages.ts';
 import type { HudState, SessionEvent, SessionHandle } from './types.ts';
+import type { BreakoutView } from './view/scene.ts';
 
 /** パドルの真上の 2 個だけのステージ。発射したボールが数秒でクリアする */
 const SHORT_STAGE: StageDef = { id: 'short', name: 'SHORT', rows: ['.....oo.....'] };
@@ -35,6 +37,15 @@ class FakeGraphics implements SessionGraphics {
   }
 }
 
+/** エンジンへ最後に伝えた一時停止を覚えるエンジン */
+class PauseSpyAudio extends AudioEngine {
+  enginePaused = false;
+  override setPaused(paused: boolean): void {
+    super.setPaused(paused);
+    this.enginePaused = paused;
+  }
+}
+
 class FakeInput implements SessionInput {
   handlers: InputHandlers;
   now: () => number;
@@ -59,6 +70,9 @@ type SetupOptions = {
   failRecovery?: boolean;
   onEvent?: (e: SessionEvent, session: SessionHandle) => void;
   onHud?: (s: HudState) => void;
+  /** 設定から決まる、衝撃に伴う画面上の効果の倍率 */
+  jolt?: number;
+  audio?: AudioEngine;
 };
 
 /** 描画・入力・時計を代役にしたセッションを作る。frame() で rAF を 1 回回す（60fps） */
@@ -70,8 +84,10 @@ async function setup(opts: SetupOptions = {}) {
   const sessionEvents: SessionEvent[] = [];
   const huds: HudState[] = [];
   let session: SessionHandle | null = null;
+  let view: BreakoutView | null = null;
   const env: SessionEnv = {
-    createGraphics: async (_view, ev) => {
+    createGraphics: async (v, ev) => {
+      view = v;
       if (opts.failRecovery && graphics.length > 0) throw new Error('no adapter');
       const g = new FakeGraphics();
       graphics.push(g);
@@ -80,8 +96,8 @@ async function setup(opts: SetupOptions = {}) {
     },
     createInput: (handlers, clock) => (input = new FakeInput(handlers, clock)),
     surface: { width: 390, height: 844, observe: () => () => {} },
-    audio: new AudioEngine(() => null),
-    settings: { cameraMotion: { shake: 1, pulse: 1, pull: 1, punch: 1 }, subscribe: () => () => {} },
+    audio: opts.audio ?? new AudioEngine(() => null),
+    settings: { cameraMotion: { shake: 1, pulse: 1, pull: 1, punch: 1, jolt: opts.jolt ?? 1 }, audio: { sfx: true, bgm: true }, subscribe: () => () => {} },
     vibrate: () => {},
     randomSeed: () => 42,
     now: () => now,
@@ -101,13 +117,15 @@ async function setup(opts: SetupOptions = {}) {
   });
   const s = session;
   const hooks: BreakoutDebugHooks | null = debugHooksOf(s);
-  if (!hooks || !input) throw new Error('the session did not start');
+  if (!hooks || !input || !view) throw new Error('the session did not start');
   const fakeInput: FakeInput = input;
+  const breakoutView: BreakoutView = view;
   return {
     session: s,
     hooks,
     input: fakeInput,
     graphics,
+    view: breakoutView,
     events: sessionEvents,
     huds,
     get current(): FakeGraphics | undefined {
@@ -175,6 +193,71 @@ describe('GameSession: 起動と描画', () => {
     for (let i = 0; i < 5; i++) h.frame();
     expect(g?.renders).toBe(paused);
     expect(h.hooks.running).toBe(false);
+  });
+});
+
+describe('GameSession: 音のエンジンの一時停止', () => {
+  const pausedSetup = async () => {
+    const audio = new PauseSpyAudio(() => null);
+    const h = await setup({ audio });
+    startShortStage(h);
+    h.session.setPaused(true);
+    expect(audio.enginePaused).toBe(true);
+    return { h, audio };
+  };
+
+  test('一時停止するとエンジンも止め、解くとエンジンも動かす', async () => {
+    const { h, audio } = await pausedSetup();
+    h.session.setPaused(false);
+    expect(audio.enginePaused).toBe(false);
+  });
+
+  test('一時停止したままプレイを終えると、エンジンの一時停止も解く', async () => {
+    const { h, audio } = await pausedSetup();
+    h.session.endRun();
+    expect(audio.enginePaused).toBe(false);
+  });
+
+  test('一時停止したまま次のプレイを用意すると、エンジンの一時停止も解く', async () => {
+    const { h, audio } = await pausedSetup();
+    h.session.prepare({ kind: 'endless' }, 0);
+    expect(audio.enginePaused).toBe(false);
+  });
+
+  test('一時停止したまま画面を離れると、エンジンの一時停止も解く', async () => {
+    const { h, audio } = await pausedSetup();
+    h.session.dispose();
+    expect(audio.enginePaused).toBe(false);
+  });
+
+  test('一時停止したまま続けられなくなったら、エンジンの一時停止も解く', async () => {
+    const audio = new PauseSpyAudio(() => null);
+    let throwOnHud = false;
+    const h = await setup({
+      audio,
+      onHud: () => {
+        if (throwOnHud) throw new Error('hud broke');
+      },
+    });
+    startShortStage(h);
+    h.session.setPaused(true);
+    expect(audio.enginePaused).toBe(true);
+    throwOnHud = true;
+    h.frame();
+    expect(h.events.map((e) => e.t)).toEqual(['fatal']);
+    expect(audio.enginePaused).toBe(false);
+  });
+});
+
+describe('GameSession: 設定', () => {
+  test('衝撃に伴う画面上の効果の倍率（設定の jolt）を、描画へ毎フレーム渡す', async () => {
+    const h = await setup({ jolt: 0.25 });
+    h.frame();
+    expect(h.view.uniforms.jolt.value).toBe(0.25);
+    startShortStage(h);
+    h.frame();
+    expect(h.view.uniforms.jolt.value).toBe(0.25);
+    h.session.dispose();
   });
 });
 

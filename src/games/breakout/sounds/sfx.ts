@@ -1,14 +1,24 @@
-import type { AudioEngine, Bus, Voice, VoiceGroup, VoicePriority, VoiceRequest } from '../../../juice/audio/engine.ts';
-import { octavePosition, pentatonicSemitones, shepardAnchor, shepardWaves } from '../../../juice/audio/shepard.ts';
-import { DEFAULT_Q, envGain, glide, jitterCents, midiToFreq, noise, oscillator, stopTime, tone } from '../../../juice/audio/synth.ts';
-
-/** Shepard tone の一番低い成分の基準周波数（C3） */
-const SHEPARD_BASE = 130.81;
-const SHEPARD_COMPONENTS = 4;
-/** Shepard tone の音程の揺らぎ（セント） */
-const SHEPARD_JITTER = 8;
-/** 音の出だしの長さ（秒） */
-const PLUCK_ATTACK = 0.002;
+import { NO_SOUND, voiceHandle } from '../../../juice/audio/engine.ts';
+import type { AudioEngine, Bus, SoundHandle, Voice, VoiceGroup, VoicePriority } from '../../../juice/audio/engine.ts';
+import { pentatonicSemitones } from '../../../juice/audio/shepard.ts';
+import {
+  DEFAULT_Q,
+  envGain,
+  glide,
+  jitterCents,
+  midiToFreq,
+  noise,
+  oscillator,
+  PLUCK_ATTACK,
+  riserInhale,
+  shepardOsc,
+  shepardPluck,
+  stopTime,
+  supersaw,
+  tone,
+} from '../../../juice/audio/synth.ts';
+import type { InhaleShape } from '../../../juice/audio/synth.ts';
+import { VoiceOpener } from '../../../juice/audio/voices.ts';
 /** 破壊音の減衰の長さ（秒）。演出の強さが 0 のときと 1 のとき */
 const BREAK_DECAY_CALM = 0.3;
 const BREAK_DECAY_BUSY = 0.16;
@@ -29,9 +39,8 @@ const FINALE_CHORD = [33, 45, 52, 57, 60, 64, 69, 71, 76, 81, 84] as const;
 const RESOLVE_CHORD = [36, 48, 55, 59, 62, 64, 67, 72, 76] as const;
 /** エンドレスの全消しの和音。解決の和音と同じ C メジャー 9 を、高い音域だけで組む */
 const ALL_CLEAR_CHORD = [60, 64, 67, 71, 74, 79] as const;
-/** supersaw の 1 音を 2 本のノコギリ波に分けるデチューン（セント） */
-const SUPERSAW_DETUNE = 9;
-
+/** 溜めの吸い込み音の音色 */
+const INHALE: InhaleShape = { noiseFrom: 350, noiseTo: 7000, toneFrom: 180, toneTo: 1400, toneLevel: 0.35 };
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 /**
@@ -43,12 +52,10 @@ const rand = (a: number, b: number) => a + Math.random() * (b - a);
  * 大量に鳴る普段の音に同時発音数の枠を奪われないようにする。
  */
 export class BreakoutSfx {
-  private readonly e: AudioEngine;
-  private readonly req: VoiceRequest;
+  private readonly voices: VoiceOpener;
 
   constructor(engine: AudioEngine, group: VoiceGroup) {
-    this.e = engine;
-    this.req = { bus: 'sfx', duration: 0, gain: 1, priority: 'normal', group };
+    this.voices = new VoiceOpener(engine, group);
   }
 
   /** パドルで打つ: 低い打撃音 + クリック */
@@ -127,7 +134,7 @@ export class BreakoutSfx {
     const v = this.open(decay + 0.04, Math.min(1.5, 0.5 + 0.28 * thick) * gain);
     if (!v) return;
     const t = v.start;
-    this.shepardPluck(v, t, step, decay, 0.2, brightness);
+    shepardPluck(v, t, pentatonicSemitones(step), decay, 0.2, brightness);
     noise(v, t, 'bandpass', rand(1800, 2600) + 800 * brightness, 1.2, 0.001, 0.028 + 0.01 * thick, 0.3, Math.random());
     // まとめて壊れたときは、低音の塊を足して重さを出す
     const thump = count >= 3 ? Math.min(0.5, 0.12 * thick) * (1 - brightness) : 0;
@@ -143,7 +150,7 @@ export class BreakoutSfx {
     const decay = 0.75;
     const env = envGain(v.ctx, t, PLUCK_ATTACK, decay, 0.16, v.out);
     const end = stopTime(t, PLUCK_ATTACK, decay);
-    for (let i = 0; i < MEGA_CHORD.length; i++) this.shepardOsc(v, t, step + MEGA_CHORD[i], 0.8, end, env);
+    for (let i = 0; i < MEGA_CHORD.length; i++) shepardOsc(v, t, pentatonicSemitones(step + MEGA_CHORD[i]), 0.8, end, env);
     glide(noise(v, t, 'bandpass', 1400, 0.8, 0.005, 0.35, 0.35, Math.random()).frequency, 7000, t + 0.355);
     glide(tone(v, t, 'sine', 120, 0.002, 0.35, 0.6).frequency, 40, t + 0.25);
   }
@@ -186,7 +193,7 @@ export class BreakoutSfx {
     const v = this.open(1.2, 0.7, 'event');
     if (!v) return;
     const t = v.start;
-    this.supersaw(v, t, ALL_CLEAR_CHORD, ALL_CLEAR_CHORD.length, 1.0, 0.004, 5000);
+    supersaw(v, t, ALL_CLEAR_CHORD, ALL_CLEAR_CHORD.length, 1.0, 0.004, 5000);
     glide(noise(v, t, 'bandpass', 900, 0.7, 0.002, 0.5, 0.3, Math.random()).frequency, 8000, t + 0.502);
     glide(tone(v, t, 'sine', 100, 0.002, 0.35, 0.5).frequency, 40, t + 0.3);
   }
@@ -224,42 +231,20 @@ export class BreakoutSfx {
     if (!v) return;
     const t = v.start;
     const count = Math.min(PEAK_VOICING.length, 5 + level * 2);
-    this.supersaw(v, t, PEAK_VOICING, count, dur, 0.08, 1400 + level * 900);
+    supersaw(v, t, PEAK_VOICING, count, dur, 0.08, 1400 + level * 900);
     glide(noise(v, t, 'bandpass', 600, 0.6, 0.25, 0.8, 0.25, Math.random()).frequency, 9000, t + 1.05);
     glide(tone(v, t, 'sine', 110, 0.002, 0.6, 0.7).frequency, 42, t + 0.5);
   }
 
   /**
    * 溜めの吸い込み音。逆再生のように duration 秒かけて音量と音程が上がり、炸裂の瞬間に途切れる。
-   * 他の音は消えている間に鳴らすので、無音を通らない lead の経路で鳴らす。
+   * 他の音は消えている間に鳴らすので、無音を通らない lead の経路で鳴らす。途中で止めるときは、返した口の stop を呼ぶ
    */
-  inhale(duration: number): void {
+  inhale(duration: number): SoundHandle {
     const v = this.open(duration + 0.02, 0.9, 'event', 'lead');
-    if (!v) return;
-    const ctx = v.ctx;
-    const t = v.start;
-    const end = t + duration;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(1, end - 0.01);
-    g.gain.linearRampToValueAtTime(0.0001, end);
-    g.connect(v.out);
-    const src = ctx.createBufferSource();
-    src.buffer = v.noise;
-    const bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.Q.value = 2.2;
-    bp.frequency.setValueAtTime(350, t);
-    bp.frequency.exponentialRampToValueAtTime(7000, end);
-    src.connect(bp).connect(g);
-    src.start(t, Math.random() * 0.5);
-    src.stop(end);
-    v.track(src);
-    const og = ctx.createGain();
-    og.gain.value = 0.35;
-    og.connect(g);
-    const o = oscillator(v, t, 'sine', 180, end, og);
-    o.frequency.exponentialRampToValueAtTime(1400, end);
+    if (!v) return NO_SOUND;
+    riserInhale(v, v.start, duration, INHALE);
+    return voiceHandle(v);
   }
 
   /** ステージクリアの炸裂: 音域全体に広がる和音と破裂音 */
@@ -267,7 +252,7 @@ export class BreakoutSfx {
     const v = this.open(3.2, 0.85, 'event');
     if (!v) return;
     const t = v.start;
-    this.supersaw(v, t, FINALE_CHORD, FINALE_CHORD.length, 2.8, 0.004, 6000);
+    supersaw(v, t, FINALE_CHORD, FINALE_CHORD.length, 2.8, 0.004, 6000);
     glide(noise(v, t, 'highpass', 900, DEFAULT_Q, 0.002, 2.2, 0.45, Math.random()).frequency, 300, t + 2.202);
     glide(noise(v, t, 'lowpass', 2000, DEFAULT_Q, 0.001, 0.9, 0.8, Math.random()).frequency, 80, t + 0.901);
     glide(tone(v, t, 'sine', 90, 0.002, 1.4, 1).frequency, 28, t + 1.2);
@@ -278,7 +263,7 @@ export class BreakoutSfx {
     const v = this.open(0.35, gain);
     if (!v) return;
     const t = v.start;
-    this.shepardPluck(v, t, step, 0.3, 0.12, 1);
+    shepardPluck(v, t, pentatonicSemitones(step), 0.3, 0.12, 1);
     tone(v, t, 'sine', midiToFreq(84 + pentatonicSemitones(step % 5)), 0.002, 0.25, 0.12);
   }
 
@@ -287,56 +272,11 @@ export class BreakoutSfx {
     const v = this.open(3.6, 0.7, 'event');
     if (!v) return;
     const t = v.start;
-    this.supersaw(v, t, RESOLVE_CHORD, RESOLVE_CHORD.length, 3.3, 0.05, 3200);
+    supersaw(v, t, RESOLVE_CHORD, RESOLVE_CHORD.length, 3.3, 0.05, 3200);
     tone(v, t, 'sine', 65.41, 0.02, 3.2, 0.6);
   }
 
   private open(duration: number, gain: number, priority: VoicePriority = 'normal', bus: Bus = 'sfx'): Voice | null {
-    const r = this.req;
-    r.bus = bus;
-    r.duration = duration;
-    r.gain = gain;
-    r.priority = priority;
-    return this.e.voice(r);
-  }
-
-  /** Shepard tone の 1 音をエンベロープ付きで鳴らす */
-  private shepardPluck(v: Voice, t: number, step: number, decay: number, peak: number, brightness: number): void {
-    const env = envGain(v.ctx, t, PLUCK_ATTACK, decay, peak, v.out);
-    this.shepardOsc(v, t, step, brightness, stopTime(t, PLUCK_ATTACK, decay), env);
-  }
-
-  /**
-   * Shepard tone の全成分を、作り置きの PeriodicWave を使う OscillatorNode 1 つで鳴らす。
-   * 揺らぎは、最も近い半音の波形からのずれとして detune で足す。
-   */
-  private shepardOsc(v: Voice, t: number, step: number, brightness: number, stopAt: number, dest: AudioNode): void {
-    const semis = pentatonicSemitones(step) + jitterCents(SHEPARD_JITTER) / 100;
-    const anchor = shepardAnchor(semis);
-    const wave = shepardWaves(v.ctx, SHEPARD_COMPONENTS).wave(anchor, brightness > 0.6 ? 'triangle' : 'sine');
-    const o = oscillator(v, t, wave, SHEPARD_BASE * 2 ** (anchor / 12), stopAt, dest);
-    o.detune.value = (octavePosition(semis) - anchor) * 100;
-  }
-
-  /**
-   * デチューンしたノコギリ波を重ねて、ローパスで削る。midis の先頭 count 音を使う。
-   * どのノコギリ波も同じエンベロープなので、1 つにまとめてからローパスへつなぐ。
-   */
-  private supersaw(v: Voice, t: number, midis: readonly number[], count: number, dur: number, attack: number, cutoff: number): void {
-    const ctx = v.ctx;
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.Q.value = 0.8;
-    lp.frequency.setValueAtTime(cutoff * 0.4, t);
-    lp.frequency.exponentialRampToValueAtTime(cutoff, t + Math.max(0.02, attack * 4));
-    lp.frequency.exponentialRampToValueAtTime(Math.max(200, cutoff * 0.25), t + dur);
-    lp.connect(v.out);
-    const env = envGain(ctx, t, attack, dur, 0.34 / Math.sqrt(count * 2), lp);
-    const end = stopTime(t, attack, dur);
-    for (let i = 0; i < count; i++) {
-      const f = midiToFreq(midis[i]);
-      oscillator(v, t, 'sawtooth', f, end, env).detune.value = -SUPERSAW_DETUNE + jitterCents(3);
-      oscillator(v, t, 'sawtooth', f, end, env).detune.value = SUPERSAW_DETUNE + jitterCents(3);
-    }
+    return this.voices.open(duration, gain, priority, bus);
   }
 }

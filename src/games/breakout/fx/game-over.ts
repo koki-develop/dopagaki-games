@@ -1,6 +1,6 @@
 import type { CameraRig } from '../../../juice/camera.ts';
+import type { FrameTime } from '../../../juice/frame-time.ts';
 import type { WorldClock } from '../../../juice/time.ts';
-import type { FrameTime } from '../frame-time.ts';
 import type { Sim } from '../sim/sim.ts';
 import type { Atmosphere, BgmPort } from './atmosphere.ts';
 import type { ParticleFx } from './particle-fx.ts';

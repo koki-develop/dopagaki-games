@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import { CameraRig } from '../../../juice/camera.ts';
-import type { FrameTime } from '../frame-time.ts';
+import type { FrameTime } from '../../../juice/frame-time.ts';
+import { emptyRows, line, simConfig, stageMode } from '../sim/sim.test-support.ts';
 import { Sim } from '../sim/sim.ts';
 import { LOOK } from '../view/look.ts';
-import { emptyRows, line, simConfig, stageMode } from '../sim/sim.test-support.ts';
 import { Atmosphere, FLASH_EPSILON, TIER_FALL_TAU, TIER_RISE_TAU } from './atmosphere.ts';
 import { createFxState } from './fx-state.ts';
 import { Recorder, recordingBgm } from './test-kit.test-support.ts';
@@ -42,7 +42,7 @@ describe('Atmosphere', () => {
     expect(t.fx.tier).toBeCloseTo(v * Math.exp(-1), 9);
   });
 
-  test('BGM へは毎フレーム今の段階を送る（同じ値の繰り返しは Bgm の側で無視する）', () => {
+  test('BGM へは毎フレーム今の段階を送る（同じ値の繰り返しは LayeredBgm の側で無視する）', () => {
     const t = setup(stageSim());
     for (let i = 0; i < 3; i++) t.step(0);
     t.step(1);

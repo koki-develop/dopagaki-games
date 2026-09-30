@@ -1,4 +1,4 @@
-import Dialog from '../ui/Dialog.tsx';
+import Dialog from './Dialog.tsx';
 
 type Props = {
   /** 確認ダイアログを出している間は、メニューを下げて確認だけを見せる */
@@ -10,7 +10,7 @@ type Props = {
 };
 
 /** 一時停止メニュー。やり直しとタイトルへ戻るのは、今のプレイが記録されずに消えるので、確認を挟む */
-export default function PauseView({ hidden, onResume, onAskRetry, onSettings, onAskTitle }: Props) {
+export default function PauseMenu({ hidden, onResume, onAskRetry, onSettings, onAskTitle }: Props) {
   return (
     <Dialog title="PAUSE" layer="base" hidden={hidden}>
       <button type="button" className="btn" data-variant="primary" onClick={onResume} data-autofocus>

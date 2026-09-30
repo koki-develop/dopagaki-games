@@ -63,12 +63,13 @@ body {
   color: var(--text);
   font-family: var(--body);
   -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
 
 /* ゲーム中は、スクロール・引っ張って更新・長押しメニュー・文字選択を止める */
-html[data-route='breakout'],
-html[data-route='breakout'] body {
+html[data-game],
+html[data-game] body {
   position: fixed;
   inset: 0;
   overflow: hidden;
@@ -304,7 +305,7 @@ p {
   cursor: pointer;
 }
 
-.segmented span {
+.segmented label > span {
   min-height: 46px;
   display: grid;
   place-items: center;
@@ -486,7 +487,7 @@ p {
 }
 
 /* =========================================================================
-   ブロック崩し: 画面と HUD
+   ゲームの画面: 共通
    ========================================================================= */
 
 /* 画面全体を覆う土台。ゲームの描画領域・HUD・各画面をこの中に重ねる */
@@ -508,6 +509,84 @@ p {
   inset: 0;
 }
 
+/* HUD の層。data-visible で出し入れする。隠している間は、見えないだけでなく、フォーカスも読み上げも届かないようにする */
+.hud-layer {
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+
+.hud-layer[data-visible='false'] {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.25s,
+    visibility 0s 0.25s;
+}
+
+.loading-text {
+  font-family: var(--display);
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+
+/* タイトルのロゴ */
+.title-logo {
+  font-family: var(--display);
+  font-weight: 400;
+  line-height: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: clamp(40px, 14vw, 88px);
+  margin-bottom: 20px;
+  color: #fff;
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.7),
+    0 0 16px var(--cyan),
+    0 0 38px rgb(var(--cyan-rgb) / 0.4);
+}
+
+.title-logo span:last-child {
+  font-size: 1.2em;
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.7),
+    0 0 16px var(--magenta),
+    0 0 38px rgb(var(--magenta-rgb) / 0.45);
+}
+
+/* 結果。演出の時刻（--result-*）は、各ゲームの結果画面が reveal.ts の RESULT_REVEAL から渡す */
+
+.result-heading {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(40px, 13vw, 80px);
+  line-height: 1;
+  color: #fff;
+  text-shadow:
+    0 0 8px rgba(255, 255, 255, 0.7),
+    0 0 22px var(--magenta),
+    0 0 50px rgb(var(--magenta-rgb) / 0.5);
+  animation: slam var(--result-heading-duration) cubic-bezier(0.2, 1.5, 0.35, 1) both;
+}
+
+.result-label {
+  font-family: var(--display);
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  color: var(--muted);
+}
+
+.result-newbest {
+  font-family: var(--display);
+  font-size: 18px;
+  color: var(--gold);
+  animation: pop-in var(--result-pop-duration) var(--result-newbest-delay) cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+
+/* =========================================================================
+   ブロック崩し: HUD
+   ========================================================================= */
+
 .hud {
   position: absolute;
   top: 0;
@@ -522,19 +601,7 @@ p {
     '. score pause'
     'chain chain chain';
   column-gap: 8px;
-  pointer-events: none;
-  transition: opacity 0.25s;
   font-family: var(--display);
-}
-
-/* 隠している間は、見えないだけでなく、フォーカスも読み上げも届かないようにする */
-.hud[data-visible='false'],
-.hud-lives[data-visible='false'] {
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity 0.25s,
-    visibility 0s 0.25s;
 }
 
 .hud-pause {
@@ -593,7 +660,8 @@ p {
 }
 
 .hud-newbest[data-active='true'] {
-  display: inline;
+  /* 弾ける変形を効かせるため、インラインのボックスにはしない */
+  display: inline-block;
   animation: pop-in 0.4s cubic-bezier(0.2, 1.8, 0.4, 1);
 }
 
@@ -643,8 +711,6 @@ p {
   background: rgb(var(--bg-rgb) / 0.6);
   border: 1px solid var(--line);
   font-family: var(--display);
-  pointer-events: none;
-  transition: opacity 0.25s;
 }
 
 .hud-lives-dots {
@@ -673,37 +739,7 @@ p {
    ブロック崩し: 各画面
    ========================================================================= */
 
-.loading-text {
-  font-family: var(--display);
-  letter-spacing: 0.2em;
-  color: var(--muted);
-}
-
 /* タイトル */
-
-.title-logo {
-  font-family: var(--display);
-  font-weight: 400;
-  line-height: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-size: clamp(40px, 14vw, 88px);
-  margin-bottom: 20px;
-  color: #fff;
-  text-shadow:
-    0 0 6px rgba(255, 255, 255, 0.7),
-    0 0 16px var(--cyan),
-    0 0 38px rgb(var(--cyan-rgb) / 0.4);
-}
-
-.title-logo span:last-child {
-  font-size: 1.2em;
-  text-shadow:
-    0 0 6px rgba(255, 255, 255, 0.7),
-    0 0 16px var(--magenta),
-    0 0 38px rgb(var(--magenta-rgb) / 0.45);
-}
 
 .choice-list {
   width: 100%;
@@ -837,20 +873,7 @@ p {
   animation: breathe 1.6s ease-in-out infinite;
 }
 
-/* 結果。演出の時刻（--result-*）は、結果画面が controller.ts の RESULT_REVEAL から渡す */
-
-.result-heading {
-  font-family: var(--display);
-  font-weight: 400;
-  font-size: clamp(40px, 13vw, 80px);
-  line-height: 1;
-  color: #fff;
-  text-shadow:
-    0 0 8px rgba(255, 255, 255, 0.7),
-    0 0 22px var(--magenta),
-    0 0 50px rgb(var(--magenta-rgb) / 0.5);
-  animation: slam var(--result-heading-duration) cubic-bezier(0.2, 1.5, 0.35, 1) both;
-}
+/* 結果 */
 
 [data-cleared='true'] .result-heading {
   text-shadow:
@@ -873,26 +896,14 @@ p {
   animation: pop-in var(--result-pop-duration) var(--result-score-delay) cubic-bezier(0.2, 1.6, 0.4, 1) both;
 }
 
-.result-label {
-  font-family: var(--display);
-  font-size: 12px;
-  letter-spacing: 0.3em;
-  color: var(--muted);
-}
-
 .result-total {
   font-family: var(--display);
   font-size: clamp(36px, 12vw, 64px);
   font-variant-numeric: tabular-nums;
   color: var(--score);
   text-shadow: 0 0 16px rgb(var(--gold-rgb) / 0.45);
-}
-
-.result-newbest {
-  font-family: var(--display);
-  font-size: 18px;
-  color: var(--gold);
-  animation: pop-in var(--result-pop-duration) var(--result-newbest-delay) cubic-bezier(0.2, 1.8, 0.4, 1) both;
+  /* 狭い画面で桁の多いスコアは、途中で折り返して画面に収める */
+  overflow-wrap: anywhere;
 }
 
 .result-best {
@@ -911,7 +922,7 @@ p {
   bottom: calc(6px + var(--safe-bottom));
   z-index: var(--z-dev);
   font: 11px/1.4 ui-monospace, monospace;
-  max-width: calc(100% - 12px);
+  max-width: calc(100% - 12px - var(--safe-left) - var(--safe-right));
 }
 
 .dev-toggle {
@@ -1011,7 +1022,9 @@ p {
   }
 }
 
-/* 動きを減らす設定では、アニメーションと HUD のスコアの跳ねを止める。要素は最後の状態で表示する */
+/*
+ * 動きを減らす設定では、アニメーション・HUD の数の跳ね・ゲーム一覧の矢印の滑りを止める。要素は最後の状態で表示する
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1021,5 +1034,9 @@ p {
 
   .hud-score {
     transform: none;
+  }
+
+  .portal-game-arrow {
+    transition: none;
   }
 }

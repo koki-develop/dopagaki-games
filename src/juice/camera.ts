@@ -1,4 +1,4 @@
-import { clamp01, easeOutCubic } from '../shared/math.ts';
+import { clamp01, easeOutCubic, ramp } from '../shared/math.ts';
 import { Noise1D } from './noise.ts';
 
 export type CameraOffset = {
@@ -11,17 +11,19 @@ export type CameraOffset = {
 };
 
 /**
- * カメラの動きの種類ごとの倍率（0 で止める、1 でそのまま）。ユーザー設定から決める（SettingsStore.cameraMotion）
+ * カメラの動きの種類ごとの倍率（0 で止める、1 でそのまま）。ユーザー設定から決める（GameSettings.cameraMotion）
  * - shake: 衝撃による揺れ（trauma）
  * - pulse: ビートに合わせた拍動
  * - pull: 大きな節目で引いて戻るズーム
  * - punch: 衝撃に伴って引いて戻るズーム。揺れの一部として扱う
+ * - jolt: 衝撃に伴う画面上の効果（ヒットストップの震え、RGB のずれなど）。揺れの一部として扱う。CameraRig は使わず、描画や演出が読む
  */
 export type CameraMotion = {
   shake: number;
   pulse: number;
   pull: number;
   punch: number;
+  jolt: number;
 };
 
 type CameraRigOptions = {
@@ -94,7 +96,7 @@ export class CameraRig {
     let pull = 0;
     for (const p of this.pulls) {
       const e = this.time - p.start;
-      const k = e < p.attack ? easeOutCubic(e / p.attack) : 1 - easeOutCubic((e - p.attack) / p.release);
+      const k = e < p.attack ? easeOutCubic(e / p.attack) : 1 - easeOutCubic(ramp(e - p.attack, p.release));
       pull += p.amount * k * (p.punch ? motion.punch : motion.pull);
     }
     out.zoom = 1 - Math.min(0.35, pull) + this.beatAmount * this.beatEnvelope * motion.pulse;

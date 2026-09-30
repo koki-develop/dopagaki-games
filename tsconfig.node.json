@@ -25,5 +25,5 @@
     "allowUnreachableCode": false
   },
   "include": ["vite.config.ts", "oxlint.config.ts", ".dependency-cruiser.ts", "lint", "build"],
-  "exclude": ["build/**/*.test.ts", "build/**/*.test-support.ts"]
+  "exclude": ["build/**/*.test.ts", "build/**/*.test-support.ts", "lint/**/*.test.ts"]
 }

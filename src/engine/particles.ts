@@ -1,9 +1,21 @@
-import * as THREE from 'three/webgpu';
 import { clamp, exp, float, Fn, max, mix, positionLocal, select, smoothstep, step, uv, vec2, vec3, vec4 } from 'three/tsl';
-import { InstanceRing, unitQuad } from '../../../engine/instanced.ts';
-import type { ParticleSpec } from '../fx/particle-shape.ts';
-import { LOOK } from './look.ts';
-import type { ViewUniforms } from './uniforms.ts';
+import * as THREE from 'three/webgpu';
+import type { Node } from 'three/webgpu';
+import { InstanceRing, unitQuad } from './instanced.ts';
+import type { ParticleSink, ParticleSpec } from './particle-spec.ts';
+
+type ParticlesOptions = {
+  /** 同時に存在できる数の上限。超えたら古いものから上書きする */
+  capacity: number;
+  /** 今の時刻。発生時刻（emit の now）と同じ時間軸の秒 */
+  time: Node<'float'>;
+  /** 発生時の色に掛ける明るさ。数が多いと加算で眩しくなるので、1 より小さくして抑える */
+  brightness: number;
+  /** 描く順番（Mesh.renderOrder） */
+  renderOrder: number;
+  /** すべての粒を point へ amount（0〜1）の割合だけ寄せる。溜めの演出で吸い込むのに使う */
+  attract?: { point: Node<'vec2'>; amount: Node<'float'> };
+};
 
 /**
  * パーティクル。発生時の条件だけを GPU に送り、位置は頂点シェーダーで時刻から計算する。
@@ -11,19 +23,19 @@ import type { ViewUniforms } from './uniforms.ts';
  * 容量を超えたら古いものから上書きする（リングバッファ）。時刻は u.time と同じ時間軸なので、世界が止まれば止まる。
  * すべて 0 のインスタンスは大きさ 0 で描かれない。
  */
-export class ParticlesView {
+export class ParticlesView implements ParticleSink {
   readonly mesh: THREE.Mesh;
   private readonly ring: InstanceRing;
 
-  constructor(u: ViewUniforms, capacity: number) {
-    this.ring = new InstanceRing(capacity, 4);
+  constructor(opts: ParticlesOptions) {
+    this.ring = new InstanceRing(opts.capacity, 4);
     const [a, b, c, e] = this.ring.nodes;
     const material = new THREE.MeshBasicNodeMaterial({ transparent: true });
     material.blending = THREE.AdditiveBlending;
     material.depthWrite = false;
     material.depthTest = false;
 
-    const age = u.time.sub(b.x);
+    const age = opts.time.sub(b.x);
     const life = max(b.y, 1e-3);
     const k = clamp(age.div(life), 0, 1);
     const alive = step(0, age).mul(step(age, life));
@@ -46,7 +58,8 @@ export class ParticlesView {
     // ベジェの接線 × パラメータの進む速さ（d(k²)/dt = 2k / life）
     const homingVel = ctrl.sub(a.xy).mul(float(1).sub(ht)).add(e.zw.sub(ctrl).mul(ht)).mul(2).mul(k.mul(2).div(life));
     const vel = mix(ballisticVel, homingVel, isHoming);
-    const pos = mix(mix(ballistic, homing, isHoming), u.focus, u.inhale.mul(0.22));
+    const moved = mix(ballistic, homing, isHoming);
+    const pos = opts.attract ? mix(moved, opts.attract.point, opts.attract.amount) : moved;
 
     const size = mix(b.z, b.w, k).mul(alive);
     const speed = vel.length();
@@ -67,15 +80,16 @@ export class ParticlesView {
       const ringD = r.sub(0.82).div(0.07);
       const ring = exp(ringD.mul(ringD).negate()).mul(1.6);
       const shapeA = mix(soft, ring, isRing);
-      // 普通の粒は時間とともに消えていく。吸い込まれる光は届く直前まで明るさを保ち、目標に溶け込むように消える
-      const fadeOut = float(1).sub(kV).pow(1.4).mul(mix(float(1), smoothstep(0, 0.15, kV), isRing));
-      const fade = mix(fadeOut, smoothstep(1, 0.85, kV), isHoming);
-      return vec4(vec3(c.x, c.y, c.z).mul(shapeA).mul(fade).mul(LOOK.particles), 1);
+      // 普通の粒は時間とともに消えていく。吸い込まれる光は届く直前まで明るさを保ち、目標に溶け込むように消える。
+      // 補間した kV はわずかに 1 を超えることがあるので、pow の底は 0 で止める（負の底では値が決まらない）
+      const fadeOut = float(1).sub(kV).max(0).pow(1.4).mul(mix(float(1), smoothstep(0, 0.15, kV), isRing));
+      const fade = mix(fadeOut, float(1).sub(smoothstep(0.85, 1, kV)), isHoming);
+      return vec4(vec3(c.x, c.y, c.z).mul(shapeA).mul(fade).mul(opts.brightness), 1);
     })();
 
     this.mesh = new THREE.Mesh(unitQuad(), material);
     this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = 30;
+    this.mesh.renderOrder = opts.renderOrder;
     this.mesh.count = this.ring.drawCount;
   }
 

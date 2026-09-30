@@ -2,7 +2,7 @@ import { parseRoute } from '../../src/app/site.ts';
 import type { Route } from '../../src/app/site.ts';
 
 /** ページを開くリクエストへの応答。正規の形へのリダイレクトか、ある画面の HTML か */
-export type PageResolution =
+type PageResolution =
   | { readonly kind: 'redirect'; readonly location: string }
   | { readonly kind: 'page'; readonly route: Route; readonly status: 200 | 404 };
 
@@ -25,4 +25,12 @@ export function resolvePage(pathname: string, search = ''): PageResolution {
 
   const route = parseRoute(pathname);
   return { kind: 'page', route, status: route === 'notFound' ? 404 : 200 };
+}
+
+/** ページを開くリクエストか。スクリプトや画像の読み込みはブラウザが Accept に text/html を入れないので、ここで分けられる */
+export function isPageRequest(method: string | undefined, accept: string | undefined, pathname: string): boolean {
+  if (method !== 'GET' && method !== 'HEAD') return false;
+  if (!accept?.includes('text/html')) return false;
+  const last = pathname.slice(pathname.lastIndexOf('/') + 1);
+  return !last.includes('.') || last.endsWith('.html');
 }

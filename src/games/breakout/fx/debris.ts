@@ -1,9 +1,9 @@
 import { effectiveCapacity } from '../../../engine/ring.ts';
 import { BLOCK_H, BLOCK_W, BlockType, FIELD_H } from '../config.ts';
 import { blockRgb } from '../view/palette.ts';
+import type { DebrisSpec } from './debris-spec.ts';
 import { Fracture, fractureRect, MAX_PIECE_VERTS, MAX_PIECES, pieceMass, rayToRect } from './fracture.ts';
 import type { PieceMass } from './fracture.ts';
-import type { DebrisSpec } from './particle-shape.ts';
 
 /** now は present の時間軸（シェーダーの u.time）の秒 */
 export type DebrisSink = { emit(now: number, spec: DebrisSpec): void };

@@ -10,10 +10,10 @@ import { renderRobots, renderSitemap } from './crawl.ts';
 import type { OgImage, PageDocument } from './head.ts';
 
 /** サイトのルートに置くファイル。path はルートからのパス */
-export type SiteFile = { readonly path: string; readonly contentType: string; readonly body: Buffer | string };
+type SiteFile = { readonly path: string; readonly contentType: string; readonly body: Buffer | string };
 
 /** 画面ごとの HTML ファイル。fileName は出力先のディレクトリからのパス */
-export type SitePage = { readonly fileName: string; readonly doc: PageDocument };
+type SitePage = { readonly fileName: string; readonly doc: PageDocument };
 
 export type Site = {
   readonly pages: readonly SitePage[];
@@ -22,7 +22,7 @@ export type Site = {
 };
 
 /** 画面の HTML のファイル名。本番は cleanUrls で拡張子を外したパス（/breakout）として配信する */
-export const pageFileName = (path: string): string => (path === '/' ? 'index.html' : `${path.slice(1)}.html`);
+const pageFileName = (path: string): string => (path === '/' ? 'index.html' : `${path.slice(1)}.html`);
 export const NOT_FOUND_FILE = '404.html';
 
 /**

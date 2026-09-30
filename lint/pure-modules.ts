@@ -1,16 +1,22 @@
 /**
  * 素のモジュール。ブラウザの機能にも Node の機能にも、時刻にも乱数にも触れない。
- * ビルドのコード（Node）からも読めて、ブロック崩しの sim は同じシードと入力なら同じ結果になる。
+ * ビルドのコード（Node）からも読めて、ブロック崩しの sim とリバーシの CPU は同じシードと入力なら同じ結果になる。
  * 素のモジュールが import してよいのは素のモジュールだけ（.dependency-cruiser.ts）で、
  * 使ってよいグローバルは決定的な ECMAScript の組み込みと、ブラウザにも Node にもある一部だけ（oxlint.config.ts）。
  *
  * `/` で終わるものはディレクトリ、それ以外はファイル。パスはリポジトリの根からの相対。
  */
-export const PURE_MODULES = [
+export const PURE_MODULES: readonly string[] = [
   'src/shared/',
   'src/app/site.ts',
   'src/games/breakout/config.ts',
+  'src/games/breakout/controller.ts',
+  'src/games/breakout/hud/layout.ts',
+  'src/games/breakout/hud/model.ts',
   'src/games/breakout/sim/',
+  'src/games/breakout/records-model.ts',
+  'src/games/breakout/session-state.ts',
+  'src/games/breakout/types.ts',
   'src/games/breakout/fx/fracture.ts',
 ];
 

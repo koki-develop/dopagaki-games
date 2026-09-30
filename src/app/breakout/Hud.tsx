@@ -1,13 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { createHudDomTarget } from '../../games/breakout/hud/dom.ts';
-import type { HudFeed } from '../../games/breakout/hud/feed.ts';
 import { computeHudLayout, sameHudLayout } from '../../games/breakout/hud/layout.ts';
 import type { Box } from '../../games/breakout/hud/layout.ts';
 import { HudPresenter } from '../../games/breakout/hud/writer.ts';
-import type { HudLayout, SessionHandle } from '../../games/breakout/types.ts';
+import type { HudState, SessionHandle } from '../../games/breakout/types.ts';
+import type { LatestFeed } from '../../shared/feed.ts';
+import { boxOf, observeLayout } from '../game/observeLayout.ts';
 
 type Props = {
-  feed: HudFeed;
+  feed: LatestFeed<HudState>;
   session: SessionHandle | null;
   visible: boolean;
   /** 残機を出す（ステージのとき） */
@@ -16,8 +17,6 @@ type Props = {
   canPause: boolean;
   onPause: () => void;
 };
-
-const boxOf = (r: DOMRect): Box => ({ left: r.left, top: r.top, width: r.width, height: r.height });
 
 /**
  * プレイ中の HUD。スコア・ベスト・chain・一時停止ボタンを上端に、ステージの残機を右下に置く。
@@ -62,9 +61,8 @@ export default function Hud({ feed, session, visible, showLives, canPause, onPau
     const scoreWrap = scoreWrapRef.current;
     const probe = bottomProbeRef.current;
     if (!session || !root || !scoreWrap || !probe) return;
-    let last: HudLayout | null = null;
+    const origin = root.parentElement ?? root;
     const measure = () => {
-      const origin = root.parentElement ?? root;
       const hud = root.getBoundingClientRect();
       // 跳ねの変形に左右されないよう、スコアの枠は変形前の位置（offset*）で測る
       const score: Box = {
@@ -73,21 +71,14 @@ export default function Hud({ feed, session, visible, showLives, canPause, onPau
         width: scoreWrap.offsetWidth,
         height: scoreWrap.offsetHeight,
       };
-      const layout = computeHudLayout(boxOf(origin.getBoundingClientRect()), boxOf(hud), score, probe.offsetHeight);
-      if (sameHudLayout(last, layout)) return;
-      last = layout;
-      session.setHudLayout(layout);
+      return computeHudLayout(boxOf(origin.getBoundingClientRect()), boxOf(hud), score, probe.offsetHeight);
     };
-    const ro = new ResizeObserver(measure);
-    ro.observe(root);
-    ro.observe(probe);
-    measure();
-    return () => ro.disconnect();
+    return observeLayout([root, probe], measure, sameHudLayout, (layout) => session.setHudLayout(layout));
   }, [session]);
 
   return (
     <>
-      <div ref={rootRef} className="hud" data-visible={visible}>
+      <div ref={rootRef} className="hud hud-layer" data-visible={visible}>
         <div className="hud-score-row">
           <div ref={scoreWrapRef} className="hud-score">
             <span ref={scoreRef} />
@@ -110,7 +101,7 @@ export default function Hud({ feed, session, visible, showLives, canPause, onPau
       </div>
 
       {/* ステージの残機は、目に入りやすい右下に置く */}
-      <div ref={livesRef} className="hud-lives" data-visible={visible && showLives} role="img" aria-label="残機">
+      <div ref={livesRef} className="hud-lives hud-layer" data-visible={visible && showLives} role="img" aria-label="残機">
         <span className="hud-label">LIFE</span>
         <span ref={livesDotsRef} className="hud-lives-dots" />
       </div>

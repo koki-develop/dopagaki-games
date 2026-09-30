@@ -1,5 +1,5 @@
 import { SoundThrottle } from '../../../juice/audio/throttle.ts';
-import type { FrameTime } from '../frame-time.ts';
+import type { FrameTime } from '../../../juice/frame-time.ts';
 import type { BreakoutSfx } from '../sounds/sfx.ts';
 import type { FrameSummary } from './aggregate.ts';
 import type { IntensityMeter } from './intensity.ts';

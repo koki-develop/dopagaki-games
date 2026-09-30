@@ -62,7 +62,6 @@ export interface ReadonlyBlockField {
   rowBottomY(row: number): number;
   topRowBottomY(): number;
   centerY(row: number): number;
-  rowAtY(y: number): number;
   liveCountBelow(y: number): number;
   lowestLiveBlockBottom(): number;
 }
@@ -101,12 +100,6 @@ export class BlockField implements ReadonlyBlockField {
 
   centerY(row: number): number {
     return this.rowBottomY(row) + CELL_H / 2;
-  }
-
-  /** y 座標が含まれる行番号。範囲外なら -1 */
-  rowAtY(y: number): number {
-    const row = Math.floor((y - this.lowestRowY) / CELL_H);
-    return row >= 0 && row < this.rowCount ? row : -1;
   }
 
   /** 下端が y より下にある行の、生きているブロックの数。浮動小数の誤差で y ちょうどの行は含めない */

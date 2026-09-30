@@ -1,12 +1,10 @@
+import { neonRgb } from '../../../engine/neon.ts';
+import { createParticleSpec, ParticleShape } from '../../../engine/particle-spec.ts';
+import type { ParticleSink, ParticleSpec } from '../../../engine/particle-spec.ts';
 import { FIELD_H, FIELD_W } from '../config.ts';
-import { blockRgb, HARD_RGB, neonRgb, SOLID_RGB } from '../view/palette.ts';
+import { blockRgb, HARD_RGB, SOLID_RGB } from '../view/palette.ts';
 import { DebrisFx } from './debris.ts';
 import type { DebrisSink } from './debris.ts';
-import { ParticleShape } from './particle-shape.ts';
-import type { ParticleSpec } from './particle-shape.ts';
-
-/** now は present の時間軸（シェーダーの u.time）の秒 */
-export type ParticleSink = { emit(now: number, spec: ParticleSpec): void };
 
 /** 光の筋の色。スコアの数字と同じ白に近い金 */
 const STREAK_RGB = [1.6, 1.45, 0.9] as const;
@@ -20,23 +18,7 @@ const TAU = 6.28318;
 export class ParticleFx {
   private readonly particles: ParticleSink;
   private readonly debris: DebrisFx;
-  private readonly p: ParticleSpec = {
-    x: 0,
-    y: 0,
-    vx: 0,
-    vy: 0,
-    life: 0,
-    size0: 0,
-    size1: 0,
-    r: 0,
-    g: 0,
-    b: 0,
-    shape: ParticleShape.Dot,
-    gravity: 0,
-    drag: 0,
-    targetX: 0,
-    targetY: 0,
-  };
+  private readonly p: ParticleSpec = createParticleSpec();
   /** メソッドの中で色を計算するための作業領域。メソッドをまたいで値を持ち越さない */
   private readonly c: [number, number, number] = [0, 0, 0];
   /** HUD のスコアの位置（ワールド座標）。得点に変わった光の筋が吸い込まれる先 */

@@ -40,7 +40,6 @@ describe('Descent', () => {
       // 最後の 1 段の落下時間ぶんだけ遅れる
       expect(moved).toBeGreaterThan(rate * (seconds - STEP_SECONDS) - 1);
       expect(moved).toBeLessThanOrEqual(rate * seconds + 1e-9);
-      expect(d.backlog).toBeLessThan(1);
     }
   });
 
@@ -63,10 +62,8 @@ describe('Descent', () => {
   test('ペナルティは落ちている途中の段の残りを引き取り、ペナルティとして着地する', () => {
     const d = new Descent();
     let moved = run(d, 5, 1).moved;
-    // 最初のステップで 1 段が始まっている（以後も毎ステップ 1 段ずつ溜まるので、ここからは止める）
-    expect(d.activeStepDrops).toBeGreaterThan(0);
+    // 最初のステップから毎ステップ 1 段ずつ始まり、どれもまだ落ちている途中
     d.startPenalty(3, 0.28);
-    expect(d.activeStepDrops).toBe(0);
     const r = run(d, 60, 0);
     moved += r.moved;
     expect(r.penaltyLandings).toBe(1);
@@ -79,9 +76,7 @@ describe('Descent', () => {
     const d = new Descent();
     d.startPenalty(3, 0.28);
     const during = run(d, 20, 0.2);
-    expect(d.activeStepDrops).toBe(0);
     expect(during.stepLandings).toBe(0);
-    expect(d.backlog).toBeGreaterThanOrEqual(1);
     const rest = run(d, 60, 0);
     expect(rest.penaltyLandings).toBe(1);
     expect(rest.stepLandings).toBeGreaterThan(0);

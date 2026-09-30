@@ -1,10 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { effectiveCapacity } from '../../../engine/ring.ts';
+import { Rng } from '../../../shared/rng.ts';
 import { BLOCK_H, BLOCK_W, BlockType, FIELD_H } from '../config.ts';
-import { Rng } from '../sim/rng.ts';
 import { blockRgb, SOLID_RGB } from '../view/palette.ts';
+import type { DebrisSpec } from './debris-spec.ts';
 import { DEBRIS_CAPACITY, DEBRIS_LIFE_MAX, DEBRIS_LIFE_MIN, DebrisFx, MAX_DEBRIS_PER_BLOCK, MAX_PIECE_AREA } from './debris.ts';
-import type { DebrisSpec } from './particle-shape.ts';
 
 type Kept = Omit<DebrisSpec, 'verts'> & { verts: number[]; now: number };
 

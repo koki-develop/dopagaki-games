@@ -21,7 +21,7 @@ type DragOptions = {
   now?: () => number;
 };
 
-type PointerLike = Event & { pointerId: number; pointerType: string; clientX: number; relatedTarget?: EventTarget | null };
+type PointerLike = Event & { pointerId: number; pointerType: string; button: number; clientX: number; relatedTarget?: EventTarget | null };
 type KeyLike = Event & { key: string; repeat: boolean; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean };
 
 /** 動かすキー。小文字にした e.key で引く */
@@ -41,7 +41,7 @@ const INTERACTIVE_SELECTOR = 'button, a[href], input, select, textarea, [content
 type Closest = { closest(selector: string): unknown };
 
 /** キーの届いた先が、ボタンや入力欄など、キー操作を自分で使う要素（またはダイアログの中）か */
-function isInteractiveTarget(target: EventTarget | null): boolean {
+export function isInteractiveTarget(target: EventTarget | null): boolean {
   const t = target as Partial<Closest> | null;
   return typeof t?.closest === 'function' && t.closest(INTERACTIVE_SELECTOR) != null;
 }
@@ -50,7 +50,7 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
  * 相対ドラッグの入力。画面のどこを触っても、指の移動量だけをパドルへ伝える。
  *
  * - 入力を受け付けるのは `setActive(true)` の間だけ。切り替えるたびに、押している指・キー・マウスの位置を忘れる
- * - Pointer Events に統一する。`pointercancel` は離したものとして扱わない（発射しない）
+ * - Pointer Events に統一する。`pointercancel` は離したものとして扱わない（発射しない）。マウスは主ボタンで押したときだけ押したものとする
  * - 複数の指が触れているときは、最初に触れた指だけを使う。その指が離れたら残っている指へ引き継ぐ
  * - マウスは押していなくても移動量を伝える（デスクトップ向け）。要素の外へ出たら位置を忘れ、戻ったときに飛ばない
  * - 矢印キーと A / D で動かせる。複数押しているときは、最後に押したキーの向き
@@ -107,10 +107,6 @@ export class RelativeDrag {
     this.heldLaunch.clear();
   }
 
-  get active(): boolean {
-    return this.activeFlag;
-  }
-
   /** キー入力による移動の向き（-1, 0, 1）。フレームごとに呼び出し側で移動量に換算する */
   get keyDirection(): number {
     const n = this.heldMove.length;
@@ -135,6 +131,8 @@ export class RelativeDrag {
   private readonly onDown = (evt: Event): void => {
     if (!this.activeFlag) return;
     const e = evt as PointerLike;
+    // 指とペンが触れたときも 0 になる
+    if (e.button !== 0) return;
     if (e.pointerType !== 'mouse') e.preventDefault();
     this.downX.set(e.pointerId, e.clientX);
     this.downAt.set(e.pointerId, this.now() / 1000);

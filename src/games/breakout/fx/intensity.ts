@@ -16,11 +16,6 @@ export class IntensityMeter {
   private readonly breakRate = new EventRate(RATE_TAU);
   intensity = 0;
 
-  /** 1 秒あたりの破壊数（ならした値） */
-  get rate(): number {
-    return this.breakRate.rate;
-  }
-
   /** dt 秒の間の破壊数と、今の chain 数を渡す。dt が 0 のフレーム（世界の時間が止まっている間）では何も変えない */
   update(breaks: number, chain: number, dt: number): void {
     if (dt <= 0) return;

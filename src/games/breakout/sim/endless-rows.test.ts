@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
+import { Rng } from '../../../shared/rng.ts';
 import { BlockType, COLS, sanitizeTuning, tuning } from '../config.ts';
 import { BlockField } from './blocks.ts';
 import { EndlessRows, hardHpAt, hardRatioAt } from './endless-rows.ts';
-import { Rng } from './rng.ts';
 
 const e = sanitizeTuning(tuning).endless;
 

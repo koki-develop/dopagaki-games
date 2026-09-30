@@ -59,4 +59,32 @@ describe('SoundThrottle', () => {
     for (let i = 0; i < 120; i++) t.frame(50);
     expect(t.throttle.gain).toBe(0.3);
   });
+
+  test('毎フレーム起きても最短間隔より詰めて鳴らさず、最後に鳴らした後の分を除いて、起きた回数をすべてどれかの音に含める', () => {
+    const opts = { minInterval: 0.08, rateTau: 0.5, halfGainRate: 12, minGain: 0.3 };
+    const t = new SoundThrottle(opts);
+    const fired: number[] = [];
+    let total = 0;
+    for (let i = 0; i < 60; i++) {
+      const count = t.update(i / 60, 1 / 60, 2);
+      if (count > 0) {
+        fired.push(i / 60);
+        total += count;
+      }
+    }
+    for (let i = 1; i < fired.length; i++) expect(fired[i] - fired[i - 1]).toBeGreaterThanOrEqual(opts.minInterval - 1e-9);
+    expect(total).toBeGreaterThan(110);
+    expect(total).toBeLessThanOrEqual(120);
+  });
+
+  test('同じ頻度なら、フレームレートによらず同じ音量にする', () => {
+    const opts = { minInterval: 0.08, rateTau: 0.5, halfGainRate: 12, minGain: 0.3 };
+    const gains = [30, 60, 120].map((hz) => {
+      const t = new SoundThrottle(opts);
+      // 1 秒に halfGainRate 回。音量はちょうど半分になる
+      for (let i = 0; i < hz * 10; i++) t.update(i / hz, 1 / hz, opts.halfGainRate / hz);
+      return t.gain;
+    });
+    for (const g of gains) expect(g).toBeCloseTo(0.5, 6);
+  });
 });

@@ -43,7 +43,7 @@ export function wallGlow(d: number): number {
 }
 
 /** 光の強さの、距離に対する変化の速さの上限（d ≥ 0 でのリプシッツ定数） */
-export const WALL_GLOW_LIPSCHITZ = WALL_GLOW.sharpGain * WALL_GLOW.sharp + WALL_GLOW.softGain * WALL_GLOW.soft;
+const WALL_GLOW_LIPSCHITZ = WALL_GLOW.sharpGain * WALL_GLOW.sharp + WALL_GLOW.softGain * WALL_GLOW.soft;
 
 /**
  * 壁の色を掛けた光が WALL_WAVE_EPSILON 以下になる距離。光は距離とともに単調に減るので二分法で求め、

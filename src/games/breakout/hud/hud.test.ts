@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { HudState } from '../types.ts';
-import { HudFeed } from './feed.ts';
-import { formatScore } from './format.ts';
+import { formatScore } from '../../../shared/format.ts';
 import { computeHudLayout, sameHudLayout } from './layout.ts';
 import { HudModel } from './model.ts';
 import { HudPresenter, HudWriter } from './writer.ts';
@@ -47,13 +46,13 @@ describe('HudModel', () => {
 
   test('得点が入ると跳ね、時間とともに 0 へ戻る', () => {
     const m = new HudModel(state());
-    const first = m.update(state({ score: 50 }), 1 / 60);
-    expect(first.bump).toBeGreaterThan(0);
-    let f = first;
-    for (let i = 0; i < 10; i++) f = m.update(state({ score: 50 }), 1 / 60);
-    expect(f.bump).toBeLessThan(first.bump);
-    for (let i = 0; i < 120; i++) f = m.update(state({ score: 50 }), 1 / 60);
-    expect(f.bump).toBe(0);
+    const first = m.update(state({ score: 50 }), 1 / 60).bump;
+    expect(first).toBeGreaterThan(0);
+    let bump = first;
+    for (let i = 0; i < 10; i++) bump = m.update(state({ score: 50 }), 1 / 60).bump;
+    expect(bump).toBeLessThan(first);
+    for (let i = 0; i < 120; i++) bump = m.update(state({ score: 50 }), 1 / 60).bump;
+    expect(bump).toBe(0);
   });
 
   test('大きく入るほど強く跳ねる', () => {
@@ -65,11 +64,24 @@ describe('HudModel', () => {
   test('chain 倍率が上がるほど強く光る。chain は 2 以上で表示する', () => {
     const m = new HudModel(state());
     expect(m.update(state({ chain: 1, multiplier: 1.05 }), 1 / 60).chain).toBe('');
-    const low = m.update(state({ chain: 2, multiplier: 1.1 }), 1 / 60);
-    const high = m.update(state({ chain: 80, multiplier: 5 }), 1 / 60);
+    const low = { ...m.update(state({ chain: 2, multiplier: 1.1 }), 1 / 60) };
+    const high = { ...m.update(state({ chain: 80, multiplier: 5 }), 1 / 60) };
     expect(low.chain).toBe('2 CHAIN ×1.10');
+    expect(high.chain).toBe('80 CHAIN ×5.00');
     expect(high.glow).toBeGreaterThan(low.glow);
     expect(high.glow).toBe(1);
+    expect(m.update(state({ chain: 80, multiplier: 5.5 }), 1 / 60).chain).toBe('80 CHAIN ×5.50');
+    expect(m.update(state({ chain: 0, multiplier: 1 }), 1 / 60).chain).toBe('');
+  });
+
+  test('同じ HudFrame を使い回し、元の値が変わらなければ同じ文字列のまま', () => {
+    const m = new HudModel(state({ score: 1234 }));
+    const a = m.update(state({ score: 1234, best: 5000 }), 1 / 60);
+    const score = a.score;
+    const b = m.update(state({ score: 1234, best: 5000, lives: 2 }), 1 / 60);
+    expect(b).toBe(a);
+    expect(b.score).toBe(score);
+    expect(b.lives).toBe(2);
   });
 
   test('最初に届いた値から表示を始める', () => {
@@ -97,6 +109,18 @@ describe('HudWriter', () => {
     expect(t.log).toEqual([]);
     w.write(m.update(state({ lives: 2 }), 1 / 60));
     expect(t.log).toEqual(['lives 2/3']);
+  });
+
+  test('同じオブジェクトの中身を書き換えて渡しても、前回書いた値と比べて書く', () => {
+    const t = fakeTarget();
+    const w = new HudWriter(t);
+    const f = { score: '0', bump: 0, glow: 0, best: '0', chain: '', lives: 3, maxLives: 3, newBest: false };
+    w.write(f);
+    t.log.length = 0;
+    f.score = '10';
+    f.lives = 2;
+    w.write(f);
+    expect(t.log).toEqual(['score 10', 'lives 2/3']);
   });
 
   test('跳ねが収まった後は書き込みが止まる', () => {
@@ -131,19 +155,6 @@ describe('HudPresenter', () => {
     const score = t.log.find((l) => l.startsWith('score '));
     expect(score).toBeDefined();
     expect(score).not.toBe('score 1,000');
-  });
-});
-
-describe('HudFeed', () => {
-  test('つないだ時点で最後の値を渡し、外した後は渡さない', () => {
-    const feed = new HudFeed();
-    feed.push(state({ score: 7 }));
-    const got: number[] = [];
-    const off = feed.connect((s) => got.push(s.score));
-    feed.push(state({ score: 8 }));
-    off();
-    feed.push(state({ score: 9 }));
-    expect(got).toEqual([7, 8]);
   });
 });
 

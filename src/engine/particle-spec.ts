@@ -1,4 +1,4 @@
-/** パーティクルの形。演出（CPU）とシェーダーの両方が使うので、three.js に依存しない場所に置く */
+/** パーティクルの形。演出（CPU）とシェーダー（particles.ts）の両方が使うので、three.js に依存しない場所に置く */
 export const ParticleShape = {
   /** 速度の方向に伸びる火花 */
   Spark: 0,
@@ -35,24 +35,24 @@ export type ParticleSpec = {
   targetY: number;
 };
 
-/** 割れたブロックの破片 1 個の発生条件。ParticleSpec と同じく、描画側は値を書き写すだけ */
-export type DebrisSpec = {
-  /** 重心（回転の中心）のワールド座標と速度（u/s） */
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  /** 回る速さ（ラジアン / 秒） */
-  spin: number;
-  /** 寿命（秒） */
-  life: number;
-  /** 縁の色（割れたブロックの縁と同じ） */
-  r: number;
-  g: number;
-  b: number;
-  /**
-   * 頂点（重心基準、反時計回り）。j 番目は (verts[2j], verts[2j + 1])。
-   * 三角形は 4 つ目の頂点に 3 つ目と同じ点を入れる
-   */
-  readonly verts: Float64Array;
-};
+/** 何も起きない粒の条件。演出側で使い回す入れ物の初期値にする */
+export const createParticleSpec = (): ParticleSpec => ({
+  x: 0,
+  y: 0,
+  vx: 0,
+  vy: 0,
+  life: 0,
+  size0: 0,
+  size1: 0,
+  r: 0,
+  g: 0,
+  b: 0,
+  shape: ParticleShape.Dot,
+  gravity: 0,
+  drag: 0,
+  targetX: 0,
+  targetY: 0,
+});
+
+/** 粒の出し先（本番では ParticlesView）。now は発生時刻で、シェーダーの u.time と同じ時間軸（present）の秒 */
+export type ParticleSink = { emit(now: number, spec: ParticleSpec): void };

@@ -1,4 +1,3 @@
-import * as THREE from 'three/webgpu';
 import {
   abs,
   clamp,
@@ -20,10 +19,11 @@ import {
   vec3,
   vec4,
 } from 'three/tsl';
+import * as THREE from 'three/webgpu';
 import type { Node } from 'three/webgpu';
-import { FIELD_H, FIELD_W } from '../config.ts';
-import type { DebrisSpec } from '../fx/particle-shape.ts';
 import { InstanceRing, unitQuad } from '../../../engine/instanced.ts';
+import { FIELD_H, FIELD_W } from '../config.ts';
+import type { DebrisSpec } from '../fx/debris-spec.ts';
 import { LOOK } from './look.ts';
 import type { ViewUniforms } from './uniforms.ts';
 

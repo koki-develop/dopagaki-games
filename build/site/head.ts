@@ -1,4 +1,4 @@
-import { absoluteUrl, documentTitle, pageOf, SITE_LOCALE, SITE_NAME } from '../../src/app/site.ts';
+import { absoluteUrl, documentTitle, isGameRoute, pageOf, SITE_LOCALE, SITE_NAME } from '../../src/app/site.ts';
 import type { PageId } from '../../src/app/site.ts';
 import { escapeHtml, replaceOnce, voidTag } from './html.ts';
 
@@ -47,10 +47,11 @@ export function renderHead(doc: PageDocument): string {
 
 /**
  * index.html（ビルド後の、スクリプトやスタイルの読み込みが入ったもの）から、ある画面の HTML を作る。
- * <head> の末尾にページごとのタグを足し、<html> に画面の名前（data-route）を書く。
- * data-route を最初から書いておくのは、ゲームの画面でスクロールを止めるスタイルを、スクリプトが動く前から効かせるため
+ * <head> の末尾にページごとのタグを足し、ゲームの画面なら <html> に data-game を書く。
+ * 最初から書いておくのは、ゲームの画面でスクロールを止めるスタイルを、スクリプトが動く前から効かせるため
  */
 export function renderDocument(indexHtml: string, doc: PageDocument): string {
-  const withRoute = replaceOnce(indexHtml, /<html\b([^>]*)>/, (_, attrs) => `<html${attrs} data-route="${doc.route}">`);
-  return replaceOnce(withRoute, /<\/head>/, () => `  ${renderHead(doc)}\n  </head>`);
+  const game = isGameRoute(doc.route) ? ' data-game' : '';
+  const withGame = replaceOnce(indexHtml, /<html\b([^>]*)>/, (_, attrs) => `<html${attrs}${game}>`);
+  return replaceOnce(withGame, /<\/head>/, () => `  ${renderHead(doc)}\n  </head>`);
 }

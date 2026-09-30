@@ -15,28 +15,35 @@ export interface HudTarget {
 }
 
 /**
- * HudFrame のうち、前回から変わった値だけを書き込み先へ渡す。
+ * HudFrame のうち、前回書いた値から変わったものだけを書き込み先へ渡す。
+ * 書いた値は自分で写して持つ（HudModel は同じ HudFrame を使い回すため）。
  * 作った直後は何も書いていない扱いなので、最初の write ですべてを書く。
  */
 export class HudWriter {
   private readonly target: HudTarget;
-  private last: HudFrame | null = null;
+  private readonly last: HudFrame = { score: '', bump: 0, glow: 0, best: '', chain: '', lives: 0, maxLives: 0, newBest: false };
+  private written = false;
 
   constructor(target: HudTarget) {
     this.target = target;
   }
 
-  write(f: HudFrame): void {
+  write(f: Readonly<HudFrame>): void {
     const p = this.last;
     const t = this.target;
-    if (p?.score !== f.score) t.score(f.score);
-    if (p?.bump !== f.bump) t.bump(f.bump);
-    if (p?.glow !== f.glow) t.glow(f.glow);
-    if (p?.best !== f.best) t.best(f.best);
-    if (p?.chain !== f.chain) t.chain(f.chain);
-    if (p?.lives !== f.lives || p.maxLives !== f.maxLives) t.lives(f.lives, f.maxLives);
-    if (p?.newBest !== f.newBest) t.newBest(f.newBest);
-    this.last = f;
+    const all = !this.written;
+    this.written = true;
+    if (all || p.score !== f.score) t.score((p.score = f.score));
+    if (all || p.bump !== f.bump) t.bump((p.bump = f.bump));
+    if (all || p.glow !== f.glow) t.glow((p.glow = f.glow));
+    if (all || p.best !== f.best) t.best((p.best = f.best));
+    if (all || p.chain !== f.chain) t.chain((p.chain = f.chain));
+    if (all || p.lives !== f.lives || p.maxLives !== f.maxLives) {
+      p.lives = f.lives;
+      p.maxLives = f.maxLives;
+      t.lives(f.lives, f.maxLives);
+    }
+    if (all || p.newBest !== f.newBest) t.newBest((p.newBest = f.newBest));
   }
 }
 

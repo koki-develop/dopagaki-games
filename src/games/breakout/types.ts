@@ -1,3 +1,5 @@
+import type { FatalCause } from '../../shared/fatal.ts';
+
 /**
  * ブロック崩しの画面（React）とゲーム本体（GameSession）の間で受け渡す型。
  * 画面の状態機械（controller.ts）は GamePort だけを通してゲームを動かし、ゲームからは SessionEvent を受け取る。
@@ -27,14 +29,6 @@ export type HudState = {
   lives: number;
   maxLives: number;
 };
-
-/**
- * ゲームを続けられなくなった原因。画面に出す文言を選ぶのに使う。
- * - init: 描画（WebGPU / WebGL2）を始められなかった
- * - lost: GPU を失い、描画を作り直せなかった
- * - internal: ゲームの処理の途中で失敗した
- */
-export type FatalCause = 'init' | 'lost' | 'internal';
 
 /** ゲームから画面へ知らせる出来事 */
 export type SessionEvent =

@@ -32,7 +32,7 @@ export function createHudDomTarget(el: HudElements): HudTarget {
     lives: (on, max) => {
       // 最大数のライトを常に並べ、失った分だけ消灯する。並びの幅は変わらない
       const dots = el.livesDots;
-      while (dots.childElementCount < max) dots.append(document.createElement('span'));
+      while (dots.childElementCount < max) dots.append(dots.ownerDocument.createElement('span'));
       while (dots.childElementCount > max) dots.lastElementChild?.remove();
       Array.from(dots.children).forEach((d, i) => {
         if (d instanceof HTMLElement) d.dataset.on = i < on ? 'true' : 'false';

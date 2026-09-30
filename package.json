@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint && depcruise src build vite.config.ts",
+    "lint": "oxlint && depcruise src build lint vite.config.ts oxlint.config.ts .dependency-cruiser.ts",
     "preview": "vite preview",
     "test": "bun test"
   },

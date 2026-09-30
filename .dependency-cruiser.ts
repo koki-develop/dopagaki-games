@@ -23,9 +23,9 @@ const config: IConfiguration = {
     },
     {
       name: 'shared-depends-on-nothing',
-      comment: 'src/shared/ は何にも依存しない',
+      comment: 'src/shared/ は何にも依存しない（テストのコードはテストの道具を読む）',
       severity: 'error',
-      from: { path: '^src/shared/' },
+      from: { path: '^src/shared/', pathNot: TEST_CODE },
       to: { pathNot: '^src/shared/' },
     },
     {
@@ -85,18 +85,18 @@ const config: IConfiguration = {
       to: { path: THREE },
     },
     {
-      name: 'breakout-fx-without-three',
-      comment: 'ブロック崩しの fx/ は three.js に依存しない',
+      name: 'fx-without-three',
+      comment: '各ゲームの fx/（演出）は three.js に依存しない',
       severity: 'error',
-      from: { path: '^src/games/breakout/fx/' },
+      from: { path: '^src/games/[^/]+/fx/' },
       to: { path: THREE, reachable: true },
     },
     {
-      name: 'breakout-fx-reads-plain-view',
-      comment: 'ブロック崩しの fx/ が view/ から読んでよいのは look.ts と palette.ts だけ',
+      name: 'fx-reads-plain-view',
+      comment: '各ゲームの fx/ が view/ から読んでよいのは look.ts と palette.ts だけ',
       severity: 'error',
-      from: { path: '^src/games/breakout/fx/' },
-      to: { path: '^src/games/breakout/view/', pathNot: '^src/games/breakout/view/(look|palette)\\.ts$' },
+      from: { path: '^src/games/([^/]+)/fx/' },
+      to: { path: '^src/games/$1/view/', pathNot: '^src/games/$1/view/(look|palette)\\.ts$' },
     },
     {
       name: 'test-code-only-from-tests',

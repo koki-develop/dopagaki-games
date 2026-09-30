@@ -1,6 +1,6 @@
-import * as THREE from 'three/webgpu';
 import { abs, exp, float, Fn, positionLocal, smoothstep, uniform, uv, vec2, vec3, vec4 } from 'three/tsl';
-import { neon, sdRoundBox } from './tsl.ts';
+import * as THREE from 'three/webgpu';
+import { neon, sdRoundBox } from '../../../engine/tsl.ts';
 import { LOOK } from './look.ts';
 import type { ViewUniforms } from './uniforms.ts';
 
@@ -37,8 +37,9 @@ export class PaddleView {
       const body = smoothstep(0.012, -0.012, d);
       const tint = neon(u.hue.div(6.28318).add(0.5));
       const edge = exp(abs(d).mul(-50)).mul(LOOK.paddle.edge).add(exp(abs(d).mul(-9)).mul(LOOK.paddle.edgeGlow));
-      // 中央の細い光の帯
-      const center = exp(p.y.div(half.y.max(1e-3)).pow(2).mul(-6)).mul(body);
+      // 中央の細い光の帯。py は負にもなるので、2 乗は掛け算で書く
+      const py = p.y.div(half.y.max(1e-3));
+      const center = exp(py.mul(py).mul(-6)).mul(body);
       const col = tint.mul(edge).add(vec3(0.9, 1.0, 1.1).mul(center.mul(LOOK.paddle.centerLine))).add(tint.mul(body.mul(LOOK.paddle.fill)));
       const flashCol = vec3(1, 1, 1.1).mul(LOOK.paddle.hitFlash).mul(this.flash).mul(body.add(edge.mul(0.5)));
       return vec4(col.add(flashCol).mul(float(1).add(u.intensity.mul(0.3))), 1);
