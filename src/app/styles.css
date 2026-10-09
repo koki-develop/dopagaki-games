@@ -590,6 +590,12 @@ p {
   animation: pop-in var(--result-pop-duration) var(--result-newbest-delay) cubic-bezier(0.2, 1.8, 0.4, 1) both;
 }
 
+.result-best {
+  font-family: var(--display);
+  font-size: 13px;
+  color: var(--muted);
+}
+
 /* =========================================================================
    ブロック崩し: HUD
    ========================================================================= */
@@ -911,12 +917,6 @@ p {
   text-shadow: 0 0 16px rgb(var(--gold-rgb) / 0.45);
   /* 狭い画面で桁の多いスコアは、途中で折り返して画面に収める */
   overflow-wrap: anywhere;
-}
-
-.result-best {
-  font-family: var(--display);
-  font-size: 13px;
-  color: var(--muted);
 }
 
 /* =========================================================================
@@ -1872,6 +1872,8 @@ p {
   font-variant-numeric: tabular-nums;
   color: var(--gold);
   line-height: 1;
+  /* 下の最高スコアとの間。行の高さが normal のブロック崩しの合計と同じだけ空ける */
+  margin-bottom: 0.2em;
   text-shadow: 0 0 18px rgb(var(--gold-rgb) / 0.55);
   overflow-wrap: anywhere;
 }

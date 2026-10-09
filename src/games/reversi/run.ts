@@ -367,6 +367,7 @@ export class Run {
       fullCombo,
       quickCount: this.score.quickCount,
       score,
+      previousBest: this.bestScore,
       newBest: this.bestScore > 0 && score.total > this.bestScore,
       practice: this.practice,
     };

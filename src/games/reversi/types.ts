@@ -30,7 +30,9 @@ export type RunResult = {
   quickCount: number;
   /** 得点の内訳 */
   score: ScoreSheet;
-  /** 合計が、これまでの最高スコア（0 より大きいとき）を超えた */
+  /** 対局を始める前の最高スコア（記録がなければ 0。練習の対局では 0） */
+  previousBest: number;
+  /** 合計が、previousBest（0 より大きいとき）を超えた */
   newBest: boolean;
   /** 開発用の操作口から任意の局面で始めた対局。記録に残さない */
   practice: boolean;

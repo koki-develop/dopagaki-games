@@ -2,6 +2,8 @@ import { useId } from 'react';
 import type { CSSProperties } from 'react';
 import { formatScore } from '../../shared/format.ts';
 import type { RunResult } from '../../games/reversi/types.ts';
+import BestLine from '../game/BestLine.tsx';
+import { resultBestOf, resultBestText } from '../game/result-best.ts';
 import { useCountUp } from '../game/useCountUp.ts';
 import Overlay from '../ui/Overlay.tsx';
 import { RESULT_REVEAL } from './reveal.ts';
@@ -14,7 +16,7 @@ type Props = {
 };
 
 /**
- * 結果画面。勝敗と石の数を出し、得点の内訳を 1 行ずつ出してから、合計をカウントアップする。最高スコアの更新も出す。
+ * 結果画面。勝敗と石の数を出し、得点の内訳を 1 行ずつ出してから、合計をカウントアップする。合計の下に最高スコア（更新したらその知らせ）を出す。
  * 負けの見出しは光らせず、負けに勝ちの点の行は出さない。記録の更新がなければ弾ける演出も出さない
  */
 export default function ResultView({ result, onRetry, onTitle }: Props) {
@@ -25,6 +27,7 @@ export default function ResultView({ result, onRetry, onTitle }: Props) {
   const human = useCountUp(result.human, RESULT_REVEAL.settleMs, RESULT_REVEAL.countUpMs);
   const cpu = useCountUp(result.cpu, RESULT_REVEAL.settleMs, RESULT_REVEAL.countUpMs);
   const total = useCountUp(result.score.total, totalAt, RESULT_REVEAL.totalCountMs);
+  const best = resultBestOf(result.newBest, result.previousBest);
 
   const style = {
     '--result-heading-duration': `${RESULT_REVEAL.headingMs}ms`,
@@ -50,7 +53,7 @@ export default function ResultView({ result, onRetry, onTitle }: Props) {
       </h1>
       {/* 数はカウントアップの途中を読まないよう、確定した値をまとめて読み上げる */}
       <p id={summaryId} className="visually-hidden">
-        石 {result.human} 対 {result.cpu}。スコア {formatScore(result.score.total)}。{result.newBest && '最高スコアを更新しました。'}
+        石 {result.human} 対 {result.cpu}。スコア {formatScore(result.score.total)}。{resultBestText(best)}
       </p>
 
       <div className="rv-result-discs">
@@ -77,7 +80,7 @@ export default function ResultView({ result, onRetry, onTitle }: Props) {
       <div className="rv-result-total">
         <span className="result-label">SCORE</span>
         <span className="rv-result-total-value">{formatScore(total)}</span>
-        {result.newBest && <span className="result-newbest">NEW BEST!</span>}
+        <BestLine best={best} />
       </div>
 
       <div className="action-list">

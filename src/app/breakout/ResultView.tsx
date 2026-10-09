@@ -3,6 +3,8 @@ import type { CSSProperties } from 'react';
 import type { RunResult } from '../../games/breakout/types.ts';
 import { formatScore } from '../../shared/format.ts';
 import { STAGES } from '../../games/breakout/stages/stages.ts';
+import BestLine from '../game/BestLine.tsx';
+import { resultBestOf, resultBestText } from '../game/result-best.ts';
 import { useCountUp } from '../game/useCountUp.ts';
 import Overlay from '../ui/Overlay.tsx';
 import { RESULT_REVEAL } from './reveal.ts';
@@ -29,6 +31,7 @@ export default function ResultView({ result, onRetry, onNext, onTitle }: Props) 
   const summaryId = useId();
   const shownTotal = useCountUp(result.score, RESULT_REVEAL.settleMs, RESULT_REVEAL.countUpMs);
   const stage = mode.kind === 'stage' ? STAGES[mode.index] : undefined;
+  const best = resultBestOf(result.newBest, result.previousBest);
 
   return (
     <Overlay role="dialog" aria-labelledby={headingId} aria-describedby={summaryId} data-cleared={cleared} style={REVEAL_STYLE}>
@@ -44,17 +47,13 @@ export default function ResultView({ result, onRetry, onNext, onTitle }: Props) 
       {/* スコアはカウントアップの途中を読まないよう、確定した値をまとめて読み上げる */}
       <p id={summaryId} className="visually-hidden">
         {mode.kind === 'stage' && `STAGE ${mode.index + 1}。`}
-        スコア {formatScore(result.score)}。{result.newBest ? '最高スコアを更新しました。' : `ベスト ${formatScore(result.previousBest)}。`}
+        スコア {formatScore(result.score)}。{resultBestText(best)}
       </p>
 
       <div className="result-score">
         <span className="result-label">SCORE</span>
         <span className="result-total">{formatScore(shownTotal)}</span>
-        {result.newBest ? (
-          <span className="result-newbest">NEW BEST!</span>
-        ) : (
-          <span className="result-best">BEST {formatScore(result.previousBest)}</span>
-        )}
+        <BestLine best={best} />
       </div>
 
       <div className="action-list">

@@ -447,10 +447,10 @@ describe('リバーシの GameSession', () => {
     h.hooks.setDebugAutoplay(true);
     h.until(() => h.events.some((e) => e.t === 'finished'), 60 * 60);
     const finished = h.events.find((e) => e.t === 'finished');
-    expect(finished?.t === 'finished' && finished.result.practice).toBe(true);
+    expect(finished?.t === 'finished' && finished.result).toMatchObject({ practice: true, previousBest: 0, newBest: false });
   });
 
-  test('HUD の最高スコアの更新は、対局中の得点が超えたときだけ。終局の石の点で超えた分は、結果にだけ出す', async () => {
+  test('HUD の最高スコアの更新は、対局中の得点が超えたときだけ。終局の石の点で超えた分は、結果にだけ出す。結果は始める前の最高スコアを持つ', async () => {
     const play = async (bestScore: number) => {
       const h = await setup();
       h.session.start({ human: BLACK }, bestScore);
@@ -462,14 +462,14 @@ describe('リバーシの GameSession', () => {
       return { h, result: finished.result };
     };
     const first = await play(0);
-    expect(first.result.newBest).toBe(false);
+    expect(first.result).toMatchObject({ previousBest: 0, newBest: false });
     // 同じ乱数の種と操作なら同じ対局になる。対局中の得点ちょうどを最高スコアにすると、対局中には超えない
     const inGame = first.result.score.moves + first.result.score.quick;
     const again = await play(inGame);
     expect(again.result.score).toEqual(first.result.score);
     expect(again.h.huds.some((s) => s.newBest)).toBe(false);
     expect(again.h.hud?.score).toBeGreaterThan(inGame);
-    expect(again.result.newBest).toBe(true);
+    expect(again.result).toMatchObject({ previousBest: inGame, newBest: true });
   });
 });
 

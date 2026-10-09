@@ -202,6 +202,6 @@ describe('Run', () => {
     const a = autoplay(BLACK, 11).result;
     const b = autoplay(BLACK, 11).result;
     expect(b).toEqual(a);
-    expect(a).toMatchObject({ practice: false, newBest: false });
+    expect(a).toMatchObject({ practice: false, previousBest: 0, newBest: false });
   });
 });

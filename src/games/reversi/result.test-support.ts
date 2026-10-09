@@ -16,6 +16,7 @@ export const runResult = (over: Partial<RunResult> = {}): RunResult => ({
   fullCombo: false,
   quickCount: 0,
   score: sheetOf({ moves: 3000, discs: 40, won: true, maxCombo: 6 }),
+  previousBest: 0,
   newBest: false,
   practice: false,
   ...over,

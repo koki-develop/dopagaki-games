@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test';
+import { formatScore } from '../../shared/format.ts';
+import { resultBestOf, resultBestText } from './result-best.ts';
 import { countUpValue } from './useCountUp.ts';
 import { keyGuard } from './useScreenGuards.ts';
 
@@ -41,5 +43,20 @@ describe('countUpValue', () => {
 
   test('長さが 0 なら最初から目標', () => {
     expect(countUpValue(42, 0, 0)).toBe(42);
+  });
+});
+
+describe('resultBestOf', () => {
+  test('更新したら NEW BEST!、しなかったら前の最高スコア、記録がなければ何も出さない', () => {
+    expect(resultBestOf(true, 1200)).toEqual({ k: 'new' });
+    expect(resultBestOf(true, 0)).toEqual({ k: 'new' });
+    expect(resultBestOf(false, 1200)).toEqual({ k: 'previous', score: 1200 });
+    expect(resultBestOf(false, 0)).toEqual({ k: 'none' });
+  });
+
+  test('読み上げは表示と同じ内容で、出さないときは空', () => {
+    expect(resultBestText({ k: 'new' })).toBe('最高スコアを更新しました。');
+    expect(resultBestText({ k: 'previous', score: 1200 })).toBe(`ベスト ${formatScore(1200)}。`);
+    expect(resultBestText({ k: 'none' })).toBe('');
   });
 });
