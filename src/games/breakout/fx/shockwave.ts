@@ -1,5 +1,6 @@
+import { PRESENT_LONG_AGO } from '../../../juice/frame-time.ts';
 import type { FxState } from './fx-state.ts';
-import { PRESENT_LONG_AGO, SHOCK_SPEED_IDLE } from './fx-state.ts';
+import { SHOCK_SPEED_IDLE } from './fx-state.ts';
 
 /**
  * 背景に広がる衝撃波の輪。ステージクリアの炸裂と、エンドレスの全消しで出す。1 回のプレイごとに作る。

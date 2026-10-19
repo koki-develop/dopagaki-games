@@ -5,6 +5,7 @@ import { createGameSession } from '../../games/breakout/session.ts';
 import { breakoutSettings, BREAKOUT_SETTING_ITEMS } from '../../games/breakout/settings.ts';
 import type { GamePort, HudState, SessionHandle } from '../../games/breakout/types.ts';
 import { errorMessage } from '../../shared/errors.ts';
+import { startFailureCause } from '../../shared/fatal.ts';
 import { LatestFeed } from '../../shared/feed.ts';
 import { createPortRelay } from '../../shared/port-relay.ts';
 import FatalView from '../game/FatalView.tsx';
@@ -42,7 +43,7 @@ export default function BreakoutScreen() {
         }),
       bind: (s) => relay.bind(s),
       loaded: () => store.dispatch({ t: 'loaded' }),
-      failed: (e) => store.dispatch({ t: 'fatal', cause: 'init', message: errorMessage(e) }),
+      failed: (e) => store.dispatch({ t: 'fatal', cause: startFailureCause(e), message: errorMessage(e) }),
     }),
   );
   const [stageEl, setStageEl] = useState<HTMLDivElement | null>(null);

@@ -3,6 +3,7 @@ import type { CameraRig } from '../../../juice/camera.ts';
 import type { FlashLimiter } from '../../../juice/flash.ts';
 import type { FrameTime } from '../../../juice/frame-time.ts';
 import type { WorldClock } from '../../../juice/time.ts';
+import { BestCrossing } from '../../../shared/best-crossing.ts';
 import { STEP_DT } from '../config.ts';
 import { EventKind, Signal } from '../sim/events.ts';
 import type { Sim } from '../sim/sim.ts';
@@ -20,7 +21,7 @@ import type { FxState } from './fx-state.ts';
 import { GameOver } from './game-over.ts';
 import { IntensityMeter } from './intensity.ts';
 import { ParticleFx } from './particle-fx.ts';
-import { NEW_BEST_PEAK_LEVEL, NewBest, playPeak } from './peak.ts';
+import { NEW_BEST_PEAK_LEVEL, playPeak } from './peak.ts';
 import type { PeakDeps } from './peak.ts';
 import { Shockwave } from './shockwave.ts';
 import { SoundDirector } from './sound-director.ts';
@@ -99,7 +100,11 @@ export class Director {
   private readonly particles: ParticleFx;
   private readonly sounds: SoundDirector;
   private readonly atmosphere: Atmosphere;
-  private readonly newBest: NewBest;
+  /**
+   * 自己ベスト。HUD の NEW! と結果画面の NEW BEST! は前のベストを上回っていればいつでも（記録がない初回も含む）、
+   * Peak の演出はプレイ中に超えた瞬間の 1 回だけ。決着の後のボーナスで超えたときはフィナーレが代わりになる
+   */
+  private readonly newBest: BestCrossing;
   private readonly peakDeps: PeakDeps;
   private readonly shockwave = new Shockwave();
   private readonly allClearDeps: AllClearDeps;
@@ -127,7 +132,7 @@ export class Director {
     this.particles = new ParticleFx(ports.particles, ports.debris);
     this.sounds = new SoundDirector(ports.sfx);
     this.atmosphere = new Atmosphere(ports.bgm, sim.blocks.breakableCount);
-    this.newBest = new NewBest(opts.previousBest);
+    this.newBest = new BestCrossing(opts.previousBest);
     const vibrate = (pattern: number | readonly number[]): void => ports.vibrate(pattern);
     this.peakDeps = { camera: opts.camera, sfx: ports.sfx, flashes: ports.flashes, atmosphere: this.atmosphere, vibrate };
     this.allClearDeps = {
@@ -173,7 +178,7 @@ export class Director {
     out.chain = s.chain;
     out.multiplier = s.chainMultiplier;
     out.best = Math.max(this.previousBest, s.score);
-    out.newBest = this.newBest.isNewBest(s.score);
+    out.newBest = this.newBest.exceeds(s.score);
     out.lives = s.lives;
   }
 
@@ -267,7 +272,7 @@ export class Director {
     }
     if (this.state === 'live' && sim.phase !== 'playing') this.beginEnding(ft, budget);
 
-    if (this.newBest.check(sim.score, sim.phase === 'playing')) playPeak(NEW_BEST_PEAK_LEVEL, ft.real, this.peakDeps);
+    if (sim.phase === 'playing' && this.newBest.cross(sim.score)) playPeak(NEW_BEST_PEAK_LEVEL, ft.real, this.peakDeps);
 
     if (this.finale.update(ft, budget)) this.finish(true);
     if (this.gameOver.update(ft)) this.finish(false);
@@ -307,7 +312,7 @@ export class Director {
     if (this.state !== 'ending') return;
     this.state = 'afterglow';
     const score = this.sim.score;
-    this.onFinished({ cleared, score, newBest: this.newBest.isNewBest(score) });
+    this.onFinished({ cleared, score, newBest: this.newBest.exceeds(score) });
   }
 
   private wallHit(now: number, y: number, side: number, total: number): void {

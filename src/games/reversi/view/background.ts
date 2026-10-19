@@ -52,7 +52,7 @@ export class BackgroundView {
         col.addAssign(beamCol.mul(beams.add(beams2.mul(0.7)).mul(reach).mul(u.rays).mul(LOOK.background.rays)));
       });
 
-      // 衝撃波（終局の決着と大きな手）。描く長さを過ぎたものと、まだ始まっていないもの（開始時刻が LONG_AGO の枠を含む）は計算しない
+      // 衝撃波（終局の決着と大きな手）。描く長さを過ぎたものと、まだ始まっていないもの（開始時刻が PRESENT_LONG_AGO の枠を含む）は計算しない
       const shockCol = mix(tint, vec3(1, 0.95, 0.85), 0.5).mul(LOOK.background.shock);
       Loop(SHOCKWAVE.slots, ({ i }) => {
         const s = u.shockwaves.element(i);

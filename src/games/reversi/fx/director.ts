@@ -3,7 +3,9 @@ import type { SilenceHandle } from '../../../juice/audio/engine.ts';
 import type { CameraRig } from '../../../juice/camera.ts';
 import type { FlashLimiter } from '../../../juice/flash.ts';
 import type { FrameTime } from '../../../juice/frame-time.ts';
+import { PRESENT_LONG_AGO } from '../../../juice/frame-time.ts';
 import type { WorldClock } from '../../../juice/time.ts';
+import { CueQueue } from '../../../shared/cue-queue.ts';
 import { AFTER_MOVE, AIR, BIG_SILENCE_DELAY, BIG_TIER, flipTier, HAPTICS, hitStopFor, INTRO, MOTION, PASS_PAUSE, SLOW_MO } from '../config.ts';
 import type { PullTuning } from '../config.ts';
 import { cellX, cellY } from '../geometry.ts';
@@ -22,8 +24,7 @@ import { BoardWaves } from './board-waves.ts';
 import { Ceremony } from './ceremony.ts';
 import type { SilencePort } from './ceremony.ts';
 import type { MoveChoreo, PreviewFlip } from './choreo.ts';
-import { CueQueue } from './cue-queue.ts';
-import { DropKind, LONG_AGO } from './discs.ts';
+import { DropKind } from './discs.ts';
 import type { DiscField } from './discs.ts';
 import type { FxState } from './fx-state.ts';
 import { ParticleFx } from './particle-fx.ts';
@@ -39,7 +40,7 @@ export type SfxPort = Pick<
   | 'place'
   | 'flipStep'
   | 'burst'
-  | 'inhale'
+  | 'drumRoll'
   | 'dread'
   | 'corner'
   | 'stable'
@@ -121,7 +122,7 @@ export class Director {
   private boardAppearing = false;
   private lastX = 0;
   private lastY = 0;
-  private lastAt = LONG_AGO;
+  private lastAt = PRESENT_LONG_AGO;
   /** 大きな手の溜めの無音 */
   private bigSilence: SilenceHandle | null = null;
   /** 着手の通し番号（盤の上の数え上げを手ごとにまとめる） */
@@ -380,10 +381,10 @@ export class Director {
       this.atmosphere.flare(f.real, hitFlash, corner ? LOOK.moments.corner.boost : 0);
       if (hitStop > 0) this.hitStop(f, x, y, tier, hitStop);
       if (tier >= BIG_TIER) {
-        // 着いた音の立ち上がりを聞かせてから、ヒットストップと返り始めるまでの溜めの間を無音にし、吸い込む音だけを鳴らす
+        // 着いた音の立ち上がりを聞かせてから、ヒットストップと返り始めるまでの溜めの間を無音にし、ドラムロールだけを鳴らす
         const hold = hitStop + (c.waveAt - c.landAt) - BIG_SILENCE_DELAY;
         this.bigSilence = this.o.ports.audio.silence(hold, 0.005, BIG_SILENCE_DELAY);
-        sfx.inhale(BIG_SILENCE_DELAY + hold);
+        sfx.drumRoll(BIG_SILENCE_DELAY + hold);
         const b = MOTION.bigHold;
         cam.pull(b.amount.base + b.amount.perTier * (tier - BIG_TIER), b.attack, b.release);
       }

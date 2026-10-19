@@ -1,3 +1,5 @@
+import { BestCrossing } from '../../../shared/best-crossing.ts';
+
 /**
  * HUD に出す得点と、最高スコアの更新。
  * 出す得点は、人の手の点を得点の文字を出したときに、終局の石の点を儀式で数えたときに足す。
@@ -8,12 +10,11 @@ export class ScoreTicker {
   shown = 0;
   /** 更新の演出を出した（HUD の BEST の表示） */
   newBest = false;
-  private readonly bestScore: number;
-  private crossed = false;
+  private readonly best: BestCrossing;
 
   /** bestScore は、これまでの最高スコア（記録がなければ 0） */
   constructor(bestScore: number) {
-    this.bestScore = bestScore;
+    this.best = new BestCrossing(bestScore);
   }
 
   /** HUD の得点に points を足す */
@@ -23,9 +24,7 @@ export class ScoreTicker {
 
   /** 対局中の得点が total になった。これで最高スコアを初めて超えたなら true（更新の演出を出す） */
   crosses(total: number): boolean {
-    if (this.crossed || this.bestScore <= 0 || total <= this.bestScore) return false;
-    this.crossed = true;
-    return true;
+    return this.best.cross(total);
   }
 
   /** 更新の演出を出した */

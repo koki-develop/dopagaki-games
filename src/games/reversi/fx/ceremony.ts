@@ -15,7 +15,7 @@ type CeremonySfx = {
   gatherLift(duration: number, rising: boolean): void;
   vanish(): void;
   countTick(side: Side, index: number, alone: boolean, rising: boolean): void;
-  inhale(duration: number): SoundHandle;
+  drumRoll(duration: number): SoundHandle;
   verdict(outcome: 'win' | 'lose' | 'draw', perfect: boolean): void;
 };
 
@@ -72,7 +72,7 @@ const pull = (camera: CeremonyDeps['camera'], p: PullTuning): void => camera.pul
  *    （人の石は左上から、CPU の石は右下から）。現れた瞬間にその組を数え、人の石の点を HUD の得点に入れる。多い側だけが最後まで続ける
  * 3. 無音で溜め、決着を叩きつける。勝ちは衝撃波・花火・明るい和音、負けは石を暗くして低い和音
  * 4. 勝ちだけ、人の石が中心から外へ波のように跳ねて締める
- * 上がっていく音・溜めの吸い込む音・外へ弾ける粒・光・演出の強さの上乗せは勝ちだけに付け、負けと引き分けには付けない。
+ * 上がっていく音・溜めのドラムロール・外へ弾ける粒・光・演出の強さの上乗せは勝ちだけに付け、負けと引き分けには付けない。
  * 儀式を終えると、HUD の得点は対局中の得点に石の点を足した値になる。
  * タップで飛ばせる。飛ばしても結果は変わらない。
  */
@@ -104,7 +104,7 @@ export class Ceremony {
   /** 儀式で HUD の得点に足した点 */
   private added = 0;
   private silenceHandle: SilenceHandle | null = null;
-  private inhaleHandle: SoundHandle | null = null;
+  private rollHandle: SoundHandle | null = null;
 
   constructor(deps: CeremonyDeps) {
     this.d = deps;
@@ -185,8 +185,8 @@ export class Ceremony {
       this.hushDone = true;
       const dur = CEREMONY.hush;
       this.silenceHandle = d.audio.silence(dur, 0.01);
-      // 上がっていく吸い込みの音は勝ちだけ。負けと引き分けは無音だけで溜める
-      if (this.won) this.inhaleHandle = d.sfx.inhale(dur);
+      // ドラムロールは勝ちだけ。負けと引き分けは無音だけで溜める
+      if (this.won) this.rollHandle = d.sfx.drumRoll(dur);
     }
     if (!this.verdictDone && w >= this.verdictAt) {
       this.verdictDone = true;
@@ -225,14 +225,14 @@ export class Ceremony {
     return true;
   }
 
-  /** 溜めの無音と吸い込む音を今すぐやめる（スキップやプレイの破棄） */
+  /** 溜めの無音とドラムロールを今すぐやめる（スキップやプレイの破棄） */
   stopHush(): void {
     const silence = this.silenceHandle;
-    const inhale = this.inhaleHandle;
+    const roll = this.rollHandle;
     this.silenceHandle = null;
-    this.inhaleHandle = null;
+    this.rollHandle = null;
     silence?.cancel();
-    inhale?.stop();
+    roll?.stop();
   }
 
   private add(points: number): void {

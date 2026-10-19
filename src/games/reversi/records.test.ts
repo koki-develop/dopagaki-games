@@ -10,7 +10,7 @@ describe('createRecordsStore', () => {
     const s = createRecordsStore({ storage });
     s.commit(runResult());
     const saved = JSON.parse(storage.mem.get(RECORDS_KEY) ?? 'null');
-    expect([saved.v, saved.wins]).toEqual([1, 1]);
+    expect([saved.v, saved.wins]).toEqual([2, 1]);
     expect(createRecordsStore({ storage }).get()).toEqual(s.get());
   });
 

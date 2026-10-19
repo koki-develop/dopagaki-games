@@ -1,6 +1,6 @@
 # dopagaki-games
 
-極端で大げさな爽快感に振り切った、スマートフォン向けのブラウザゲーム集。React 19 と Vite で作り、ゲームの描画は three.js の WebGPURenderer（WebGL2 へ自動で切り替わる）で行う。各ゲームは `src/games/<ゲーム名>/` に置き、ゲーム固有の決まりはそこの `AGENTS.md` に書く。
+極端で大げさな爽快感に振り切った、スマートフォン向けのブラウザゲーム集（ブロック崩し・リバーシ・ブラックジャック）。React 19 と Vite で作り、ゲームの描画は three.js の WebGPURenderer（WebGL2 へ自動で切り替わる）で行う。各ゲームは `src/games/<ゲーム名>/` に置き、ゲーム固有の決まりはそこの `AGENTS.md` に書く。
 
 ## セットアップとコマンド
 
@@ -19,9 +19,9 @@
 
 ## ディレクトリと依存の向き
 
-- `src/shared/`: 何にも依存しない小さな関数と部品（数値の計算、スコアの表示（`format.ts`）、例外の文言、ゲームを続けられなくなった原因（`fatal.ts`）、シードつきの乱数、画面の状態機械の器、一時停止メニューの遷移（`pause-menu.ts`）、読み込み中のゲーム本体への命令の中継（`port-relay.ts`）、表示係への中継）
-- `src/engine/`: 描画の土台（レンダラーと GPU を失ったときの作り直し、描画領域、ポストエフェクト、インスタンス描画、粒、画面全体のフラッシュと絞り込み、フレームループ、品質の自動調整）と入力（相対ドラッグ、位置を指す入力）、開発ビルドの操作口の置き場
-- `src/juice/`: 手触りの部品（Web Audio のエンジン、BGM の土台、音の合成と残響・歪み、カメラの揺れ、時間の流れ（スローモーションとヒットストップ）、1 フレームの時刻、明滅の制限、振動、ゲームごとの設定の器、「視差効果を減らす」の窓口、記録の保存）
+- `src/shared/`: 何にも依存しない小さな関数と部品（数値の計算、スコアの表示（`format.ts`）、例外の文言、ゲームを続けられなくなった原因（`fatal.ts`。ゲームに要るデータを読み込めなかったときは `LoadError` を投げる）、シードつきの乱数、画面の状態機械の器、一時停止メニューの遷移（`pause-menu.ts`）、読み込み中のゲーム本体への命令の中継（`port-relay.ts`）、表示係への中継、時刻つきの予定の列（`cue-queue.ts`）、最高スコアを超えた瞬間の判定（`best-crossing.ts`））
+- `src/engine/`: 描画の土台（レンダラーと GPU を失ったときの作り直し、描画領域、ポストエフェクト、インスタンス描画、粒、画面全体のフラッシュと絞り込みと集中線、フレームループ、品質の自動調整）と入力（相対ドラッグ、位置を指す入力）、開発ビルドの操作口の置き場
+- `src/juice/`: 手触りの部品（Web Audio のエンジン、BGM の土台、音の合成と残響・歪み、はじいた弦の音（`audio/pluck.ts`）、カメラの揺れ、時間の流れ（スローモーションとヒットストップ）、1 フレームの時刻と present の時間軸の「まだ起きていない」時刻（`frame-time.ts`）、画面全体の空気（`air.ts`）、明滅の制限、振動、ゲームごとの設定の器、「視差効果を減らす」の窓口、記録の保存）
 - `src/games/<ゲーム名>/`: ゲーム本体
 - `src/app/`: React の画面（ポータルと各ゲームの UI）とスタイル。ゲームの画面に共通するフックとエラー画面、結果画面の最高スコアの欄は `src/app/game/`、一時停止のメニューなどの部品は `src/app/ui/`
 - `build/`: Vite のプラグイン（`build/site/plugin.ts`）。ページごとの HTML（題名・説明・canonical・OGP）、OG 画像、アイコン、`sitemap.xml`、`robots.txt` を作る。Node で動く
@@ -57,8 +57,10 @@ three.js を import してよいのは `src/engine/` と、各ゲームの `view
 - 毎フレームの HUD の値は `shared/feed.ts` の `LatestFeed`、ときどき起きる出来事は `EventFeed` で画面へ渡す
 - 記録の保存: `juice/persistent.ts` の `createPersistentStore`（版つき、別のタブの保存と合わせる）
 - 設定: ゲームごとに持つ（各ゲームの `settings.ts`）。`juice/settings.ts` の `createGameSettings` に、保存先のキー・項目・既定値と、項目からカメラの動きと音の切り替えを決める方法（`SettingsSchema`）を渡して作る。画面の揺れ・効果音・BGM の 3 項目なら `standardSettingsSchema` にキーを渡して作る。ページで 1 つを共有する設定は `sharedGameSettings` で最初に読んだときに作る。保存するのはユーザーが選んだ項目だけで、選んでいない項目は既定値に従う。セッションは `bindAudioSwitches` で、効果音と BGM の切り替えを `AudioEngine.setEnabled` へ渡す。設定の画面は `app/ui/SettingsPanel.tsx` に、そのゲームの設定と項目（`SettingItem`）を渡して開く
-- BGM: `juice/audio/bgm.ts` の `LayeredBgm` に、曲の中身（`Arrangement`）を渡す。効果音の枠は `juice/audio/voices.ts` の `VoiceOpener`
+- BGM: `juice/audio/bgm.ts` の `LayeredBgm` に、曲の中身（`Arrangement`）を渡す。曲ごとの部屋の響き（`Arrangement.room`）は、効果音の共通の残響とは別に持つ。効果音の枠は `juice/audio/voices.ts` の `VoiceOpener`
 - 一時停止: セッションの `setPaused` で、BGM の `pause()` / `resume()` と一緒に `AudioEngine.setPaused` を呼び、鳴っている効果音ごと止める。エンジンはページで 1 つなので、プレイを終えたとき・次のプレイを始めたとき・続けられなくなったとき・セッションを捨てたときは `setPaused(false)` で解く（`unlock()` では解けない）
+- 画面全体の空気（演出の強さ、フラッシュと bloom のブースト、放射状の光、虹色、負けの暗さ、フィーバーのビート、ヒットストップの震え・集中線・RGB のずれ、BGM の段階と終盤の高まり）: リバーシとブラックジャックは、`juice/air.ts` の `Air` に調整値（`AirTuning`。BGM の段階の上限と、BGM に重ねる終盤の高まりを使うかも、ここで決める）を渡して作り、`fx/atmosphere.ts` がゲームに固有の値を足す。ブロック崩しの空気はボールの数の段階から決まり、別に持つ。集中線の描画は `engine/screen-fx.ts` の `ImpactLines`
+- 演出の予定: 時刻つきの予定は `shared/cue-queue.ts` の `CueQueue` に並べ、時刻の来たフレームで出す。プレイ中に最高スコアを超えた瞬間は `shared/best-crossing.ts` の `BestCrossing` で決める
 - 開発ビルドの操作口: `engine/debug-hooks.ts` の `DebugHookSlot` で `window.__<ゲーム名>` に置く。画面の調整パネルは、セッションから操作口を引く（`DebugHookSlot.of`）
 
 ## コードの書き方
@@ -72,6 +74,7 @@ three.js を import してよいのは `src/engine/` と、各ゲームの `view
 - 頂点の式（`positionNode` と varying に渡す式）は `Fn` の外で組むので、`Loop` や `If`、`assign` を使わない（使っても式に入らない）
 - `smoothstep` は edge0 < edge1 で書く（下がる段差は 1 から `smoothstep` を引く）
 - `pow` の底は負にしない（負の底では値が決まらない）。負になりうる値の 2 乗は `x * x` で書く
+- `If` の分岐の中で、分岐の外で作った式を使うときは、分岐の前に `toVar()` で変数にする。式のままだと、最初にその式を使った分岐の中でだけ値が作られ、ほかの分岐やその後では作られていない値を読む
 - シェーダーの式は、`src/engine/node-graph.test-support.ts` で `Fn` の中まで辿って確かめる。uniform を読むかは `reaches`、`smoothstep` の両端の順は `reversedSmoothsteps`、`pow` は `isPow` と `unguardedPows`
 
 ## 演出

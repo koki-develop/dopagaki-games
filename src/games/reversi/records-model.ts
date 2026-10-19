@@ -15,8 +15,6 @@ export type Records = {
   perfect: number;
   /** 1 局の得点の最高 */
   bestScore: number;
-  /** 最大コンボ */
-  maxCombo: number;
 };
 
 /** 記録を読み、対局の結果を反映する窓口。React からは useSyncExternalStore で読む */
@@ -35,20 +33,10 @@ export const emptyRecords = (): Records => ({
   draws: 0,
   perfect: 0,
   bestScore: 0,
-  maxCombo: 0,
 });
 
 /** 0 以上の安全な整数だけを受け付ける。負数・NaN・非数・桁あふれした値は 0 として扱う */
 const count = (v: unknown): number => (typeof v === 'number' && Number.isSafeInteger(Math.floor(v)) && v >= 0 ? Math.floor(v) : 0);
-
-/** max を超える値はありえないので、壊れた値として 0 にする */
-const bounded = (v: unknown, max: number): number => {
-  const n = count(v);
-  return n <= max ? n : 0;
-};
-
-/** 1 局で人が打てる手の数の上限（コンボの上限） */
-const MAX_MOVES = 60;
 
 /** 辻褄を合わせる。対局数は勝ち・負け・引き分けの合計より少なくせず、パーフェクトは勝ちの数を超えさせない */
 function consistent(r: Records): Records {
@@ -68,7 +56,6 @@ export function sanitizeRecords(raw: Readonly<Record<string, unknown>>): Records
     draws: count(raw.draws),
     perfect: count(raw.perfect),
     bestScore: count(raw.bestScore),
-    maxCombo: bounded(raw.maxCombo, MAX_MOVES),
   });
 }
 
@@ -81,7 +68,6 @@ export function mergeRecords(a: Records, b: Records): Records {
     draws: Math.max(a.draws, b.draws),
     perfect: Math.max(a.perfect, b.perfect),
     bestScore: Math.max(a.bestScore, b.bestScore),
-    maxCombo: Math.max(a.maxCombo, b.maxCombo),
   });
 }
 
@@ -98,6 +84,5 @@ export function applyResult(r: Records, result: RunResult): Records {
     draws: r.draws + (result.outcome === 'draw' ? 1 : 0),
     perfect: r.perfect + (result.perfect ? 1 : 0),
     bestScore: Math.max(r.bestScore, result.score.total),
-    maxCombo: Math.max(r.maxCombo, result.maxCombo),
   };
 }

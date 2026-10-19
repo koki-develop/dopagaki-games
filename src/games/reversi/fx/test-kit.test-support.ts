@@ -45,7 +45,7 @@ const SFX_METHODS = [
   'place',
   'flipStep',
   'burst',
-  'inhale',
+  'drumRoll',
   'dread',
   'corner',
   'stable',
@@ -61,13 +61,13 @@ const SFX_METHODS = [
   'verdict',
 ] as const satisfies readonly (keyof SfxPort)[];
 
-/** 呼ばれた効果音を記録する。止められる音（inhale）は、止めたことも sfx.inhale.stop として記録する */
+/** 呼ばれた効果音を記録する。止められる音（drumRoll）は、止めたことも sfx.drumRoll.stop として記録する */
 function recordingSfx(rec: Recorder): SfxPort {
   const sfx = {} as Record<(typeof SFX_METHODS)[number], (...args: unknown[]) => unknown>;
   for (const m of SFX_METHODS) sfx[m] = (...args: unknown[]) => rec.record(`sfx.${m}`, args);
-  sfx.inhale = (...args: unknown[]) => {
-    rec.record('sfx.inhale', args);
-    return { stop: () => rec.record('sfx.inhale.stop', []) };
+  sfx.drumRoll = (...args: unknown[]) => {
+    rec.record('sfx.drumRoll', args);
+    return { stop: () => rec.record('sfx.drumRoll.stop', []) };
   };
   return sfx as unknown as SfxPort;
 }

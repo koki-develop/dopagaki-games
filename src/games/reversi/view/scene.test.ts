@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import type * as THREE from 'three/webgpu';
 import type { FrameTime } from '../../../juice/frame-time.ts';
+import { PRESENT_LONG_AGO } from '../../../juice/frame-time.ts';
 import { RIPPLE, SHOCKWAVE } from '../config.ts';
-import { LONG_AGO } from '../fx/discs.ts';
 import { createFxState } from '../fx/fx-state.ts';
 import { reaches, reversedSmoothsteps } from '../../../engine/node-graph.test-support.ts';
 import { ReversiView } from './scene.ts';
@@ -86,13 +86,13 @@ describe('ReversiView の uniform', () => {
     expect(u.lastMove.value.toArray()).toEqual([10, 11, 12]);
   });
 
-  test('まだ起きていない波紋と衝撃波（開始時刻が LONG_AGO）は、描く長さの外にあるので描かれない', () => {
+  test('まだ起きていない波紋と衝撃波（開始時刻が PRESENT_LONG_AGO）は、描く長さの外にあるので描かれない', () => {
     const fx = createFxState();
-    for (let i = 0; i < RIPPLE.slots; i++) expect(fx.ripples[i * 4 + 2]).toBe(LONG_AGO);
-    for (let i = 0; i < SHOCKWAVE.slots; i++) expect(fx.shockwaves[i * 4 + 2]).toBe(LONG_AGO);
-    // present は 0 から増えるだけなので、経過時間は -LONG_AGO 以上になる
-    expect(-LONG_AGO).toBeGreaterThan(RIPPLE.life);
-    expect(-LONG_AGO).toBeGreaterThan(SHOCKWAVE.life);
+    for (let i = 0; i < RIPPLE.slots; i++) expect(fx.ripples[i * 4 + 2]).toBe(PRESENT_LONG_AGO);
+    for (let i = 0; i < SHOCKWAVE.slots; i++) expect(fx.shockwaves[i * 4 + 2]).toBe(PRESENT_LONG_AGO);
+    // present は 0 から増えるだけなので、経過時間は -PRESENT_LONG_AGO 以上になる
+    expect(-PRESENT_LONG_AGO).toBeGreaterThan(RIPPLE.life);
+    expect(-PRESENT_LONG_AGO).toBeGreaterThan(SHOCKWAVE.life);
   });
 });
 

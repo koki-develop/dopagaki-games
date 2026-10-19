@@ -126,6 +126,8 @@ export class MockFilter extends MockNode {
   type = 'lowpass';
   readonly frequency = new MockParam(350);
   readonly Q = new MockParam(1);
+  /** peaking と shelf の持ち上げ（dB） */
+  readonly gain = new MockParam(0);
 
   constructor() {
     super('biquad');

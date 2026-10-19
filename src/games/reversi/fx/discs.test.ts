@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test';
+import { PRESENT_FAR_AHEAD, PRESENT_LONG_AGO } from '../../../juice/frame-time.ts';
 import { cellX, cellY } from '../geometry.ts';
 import type { Bits } from '../rules/bits.ts';
 import { BLACK, initialPosition, SQUARES, WHITE } from '../rules/position.ts';
-import { DISC_OFFSET, DISC_STRIDE, DiscField, DropKind, FAR_AHEAD, LONG_AGO } from './discs.ts';
+import { DISC_OFFSET, DISC_STRIDE, DiscField, DropKind } from './discs.ts';
 
 const O = DISC_OFFSET;
 
@@ -14,7 +15,7 @@ const lane = (d: DiscField, s: number, key: keyof typeof DISC_OFFSET): number =>
 
 describe('起きていない出来事の時刻', () => {
   test('シェーダーが足す 0.1 秒の幅が、f32 で丸め消えない', () => {
-    for (const t of [LONG_AGO, FAR_AHEAD]) {
+    for (const t of [PRESENT_LONG_AGO, PRESENT_FAR_AHEAD]) {
       expect(Math.fround(t + 0.1)).toBeGreaterThan(Math.fround(t));
     }
   });
@@ -42,7 +43,7 @@ describe('DiscField', () => {
       expect([lane(d, s, 'x'), lane(d, s, 'y')]).toEqual([cellX(s), cellY(s)]);
       expect([lane(d, s, 'from'), lane(d, s, 'to'), d.shown[s]]).toEqual([-1, -1, -1]);
       for (const k of ['flipStart', 'dropStart', 'moveStart', 'legalSince', 'legalUntil', 'previewSince', 'stableSince', 'countedAt', 'dimAt'] as const) {
-        expect(lane(d, s, k)).toBe(LONG_AGO);
+        expect(lane(d, s, k)).toBe(PRESENT_LONG_AGO);
       }
       expect([lane(d, s, 'moveFromX'), lane(d, s, 'moveFromY')]).toEqual([cellX(s), cellY(s)]);
     }
@@ -84,7 +85,7 @@ describe('DiscField', () => {
   test('合法手の印は、変わったマスだけ時刻を書く。消した印はその時刻からフェードする', () => {
     const d = new DiscField();
     d.setLegal(only(19), 1);
-    expect([lane(d, 19, 'legalSince'), lane(d, 19, 'legalUntil')]).toEqual([1, FAR_AHEAD]);
+    expect([lane(d, 19, 'legalSince'), lane(d, 19, 'legalUntil')]).toEqual([1, PRESENT_FAR_AHEAD]);
     const v = d.version;
     d.setLegal(only(19), 2);
     expect(d.version).toBe(v);
@@ -124,14 +125,14 @@ describe('DiscField', () => {
     d.dim(0, 9);
     expect([lane(d, 0, 'countedAt'), lane(d, 0, 'dimAt')]).toEqual([8, 9]);
     d.clear();
-    expect([lane(d, 0, 'moveStart'), lane(d, 0, 'countedAt'), lane(d, 0, 'dimAt'), d.shown[0]]).toEqual([LONG_AGO, LONG_AGO, LONG_AGO, -1]);
+    expect([lane(d, 0, 'moveStart'), lane(d, 0, 'countedAt'), lane(d, 0, 'dimAt'), d.shown[0]]).toEqual([PRESENT_LONG_AGO, PRESENT_LONG_AGO, PRESENT_LONG_AGO, -1]);
   });
 
-  test('動きなしで置いた石は、移し始めが LONG_AGO のまま（描画では、とうに現れきった石）で、盤に見える色になる', () => {
+  test('動きなしで置いた石は、移し始めが PRESENT_LONG_AGO のまま（描画では、とうに現れきった石）で、盤に見える色になる', () => {
     const d = new DiscField();
     d.gather(5, BLACK, 1, 2, 7);
     d.place(5, WHITE);
-    expect([lane(d, 5, 'moveStart'), lane(d, 5, 'moveFromX'), lane(d, 5, 'moveFromY')]).toEqual([LONG_AGO, cellX(5), cellY(5)]);
+    expect([lane(d, 5, 'moveStart'), lane(d, 5, 'moveFromX'), lane(d, 5, 'moveFromY')]).toEqual([PRESENT_LONG_AGO, cellX(5), cellY(5)]);
     expect([lane(d, 5, 'from'), lane(d, 5, 'to'), d.shown[5]]).toEqual([WHITE, WHITE, WHITE]);
   });
 });

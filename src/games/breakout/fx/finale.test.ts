@@ -6,7 +6,6 @@ import { dropAllBalls } from '../sim/sim.test-support.ts';
 import { SOLID_RGB } from '../view/palette.ts';
 import { FINALE_SETTLE, SHOCK_SPEED, SHOCK_TRAVEL } from './finale.ts';
 import { GAME_OVER_FINISH } from './game-over.ts';
-import { NewBest } from './peak.ts';
 import { clearingSim, Harness, losingSim, SOLID_ROWS } from './test-kit.test-support.ts';
 
 /** フィナーレで鳴る音（音の順番で段階の進み方を見る） */
@@ -153,26 +152,6 @@ describe('GameOver', () => {
     expect(h.worldScale).toBeCloseTo(0.12, 6);
     expect(h.finishes).toBe(1);
     expect(h.real).toBeGreaterThan(GAME_OVER_FINISH);
-  });
-});
-
-describe('NewBest', () => {
-  test('HUD はいつでも前のベストとの比較、Peak はプレイ中に 1 回だけ', () => {
-    const b = new NewBest(100);
-    expect(b.isNewBest(100)).toBe(false);
-    expect(b.isNewBest(101)).toBe(true);
-    expect(b.check(150, false)).toBe(false);
-    expect(b.check(50, true)).toBe(false);
-    expect(b.check(150, true)).toBe(true);
-    expect(b.check(200, true)).toBe(false);
-  });
-
-  test('前のベストが 0（記録がない）ときは、得点すれば新記録だが、Peak は出さない', () => {
-    const b = new NewBest(0);
-    expect(b.isNewBest(0)).toBe(false);
-    expect(b.isNewBest(1)).toBe(true);
-    expect(b.check(100000, true)).toBe(false);
-    expect(b.check(100000, true)).toBe(false);
   });
 });
 

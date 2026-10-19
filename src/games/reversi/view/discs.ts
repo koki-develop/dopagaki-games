@@ -3,8 +3,9 @@ import * as THREE from 'three/webgpu';
 import type { Node } from 'three/webgpu';
 import { InstanceBuffer, unitQuad } from '../../../engine/instanced.ts';
 import { neon } from '../../../engine/tsl.ts';
+import { PRESENT_LONG_AGO } from '../../../juice/frame-time.ts';
 import { CEREMONY, RIPPLE, WARP_ARRIVE } from '../config.ts';
-import { DISC_LANES, LONG_AGO } from '../fx/discs.ts';
+import { DISC_LANES } from '../fx/discs.ts';
 import type { DiscField } from '../fx/discs.ts';
 import { SQUARES } from '../rules/position.ts';
 import { LOOK } from './look.ts';
@@ -65,7 +66,7 @@ export class DiscsView {
     // ---- 頂点: 位置と高さ ----
     // 終局で並べ直す動き: 元の位置で白く光りながら縮んで消え、消えたまま少し間を置いて、
     // 並べ直す位置に行き過ぎるほど大きく現れて戻る（長さは config.ts の CEREMONY.warp）。
-    // 移していない石は移し始めが LONG_AGO なので、とうに現れきった石と同じ（位置は a.xy、大きさ 1、光なし）
+    // 移していない石は移し始めが PRESENT_LONG_AGO なので、とうに現れきった石と同じ（位置は a.xy、大きさ 1、光なし）
     const moveAge = t.sub(d.z);
     const warped = step(CEREMONY.warp.vanish, moveAge);
     const arrived = step(WARP_ARRIVE, moveAge);
@@ -219,16 +220,16 @@ export class DiscsView {
         .add(vec3(1, 1, 1).mul(spec));
 
       // 確定石: 淡い金の結晶の光。確定した瞬間は強く光る
-      // 時刻が LONG_AGO のままなら、まだ起きていない
+      // 時刻が PRESENT_LONG_AGO のままなら、まだ起きていない
       const stableAge = t.sub(e.w);
-      const stableOn = step(0, stableAge).mul(step(LONG_AGO / 2, e.w));
+      const stableOn = step(0, stableAge).mul(step(PRESENT_LONG_AGO / 2, e.w));
       const stableRing = exp(sq(r.sub(0.8).div(0.05)).negate());
       const sparkle = sin(t.mul(3).add(un.mul(9)).add(vn.mul(7))).mul(0.5).add(0.5).pow(6);
       const stableGlow = stableRing.mul(float(0.3).add(sparkle.mul(0.5)).add(exp(stableAge.mul(-5)).mul(2.5))).mul(stableOn).mul(LOOK.disc.stable);
 
       const countBoost = float(1).add(vCountPop.mul(1.6));
       const dimAge = t.sub(f.w);
-      const dim = float(1).sub(smoothstep(0, 0.6, dimAge).mul(step(0, dimAge)).mul(step(LONG_AGO / 2, f.w)).mul(0.68));
+      const dim = float(1).sub(smoothstep(0, 0.6, dimAge).mul(step(0, dimAge)).mul(step(PRESENT_LONG_AGO / 2, f.w)).mul(0.68));
       const discCol = mix(edgeCol, faceCol.add(vec3(...STABLE_RGB).mul(stableGlow)), inFace)
         .mul(countBoost)
         .mul(dim)

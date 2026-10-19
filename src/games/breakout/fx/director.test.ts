@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { FlashLimiter } from '../../../juice/flash.ts';
+import { PRESENT_LONG_AGO } from '../../../juice/frame-time.ts';
 import { BlockType, STEP_DT, tuning } from '../config.ts';
 import { EventKind } from '../sim/events.ts';
 import { cellCenterX } from '../sim/blocks.ts';
@@ -8,7 +9,7 @@ import { dropAllBalls, emptyRows, line, placeBall, simConfig, stageMode } from '
 import { SOLID_RGB } from '../view/palette.ts';
 import { LOOK } from '../view/look.ts';
 import { FINALE_HOLD, SHOCK_SPEED } from './finale.ts';
-import { createFxState, PRESENT_LONG_AGO } from './fx-state.ts';
+import { createFxState } from './fx-state.ts';
 import type { FxState } from './fx-state.ts';
 import { GAME_OVER_FINISH } from './game-over.ts';
 import { clearingSim, Harness, losingSim } from './test-kit.test-support.ts';

@@ -11,6 +11,7 @@ import RouteErrorBoundary from './app/ui/RouteErrorBoundary.tsx';
 // three.js を含むゲーム本体は、ゲームを開いたときに初めて読み込む
 const BreakoutScreen = lazy(() => import('./app/breakout/BreakoutScreen.tsx'));
 const ReversiScreen = lazy(() => import('./app/reversi/ReversiScreen.tsx'));
+const BlackjackScreen = lazy(() => import('./app/blackjack/BlackjackScreen.tsx'));
 
 export default function App() {
   const route = useRoute();
@@ -45,6 +46,14 @@ function RouteView({ route }: { route: Route }) {
         <RouteErrorBoundary key={route}>
           <Suspense fallback={<LoadingScreen />}>
             <ReversiScreen />
+          </Suspense>
+        </RouteErrorBoundary>
+      );
+    case 'blackjack':
+      return (
+        <RouteErrorBoundary key={route}>
+          <Suspense fallback={<LoadingScreen />}>
+            <BlackjackScreen />
           </Suspense>
         </RouteErrorBoundary>
       );

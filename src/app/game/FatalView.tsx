@@ -5,6 +5,7 @@ import Overlay from '../ui/Overlay.tsx';
 /** エラー画面の説明。原因ごとに、何ができなかったかを書く */
 const FATAL_TEXT: Record<FatalCause, string> = {
   init: 'このブラウザでは、ゲームの描画（WebGPU / WebGL2）を始められませんでした。',
+  load: 'ゲームの画像を読み込めませんでした。通信の状態を確かめて、ページを開き直してください。',
   lost: 'GPU との接続が切れ、ゲームの描画を作り直せませんでした。',
   internal: 'ゲームの処理で問題が起きたため、続けられませんでした。',
 };

@@ -9,11 +9,11 @@ const records = (over: Partial<Records>): Records => ({ ...emptyRecords(), ...ov
 const consistent = (r: Records): boolean => r.played >= r.wins + r.losses + r.draws && r.perfect <= r.wins;
 
 describe('applyResult', () => {
-  test('勝ち・負け・引き分けを数え、最高スコアと最大コンボを更新する', () => {
+  test('勝ち・負け・引き分けを数え、最高スコアを更新する', () => {
     let r = emptyRecords();
     r = applyResult(r, runResult());
     r = applyResult(r, runResult({ maxCombo: 3, score: sheetOf({ moves: 9000, discs: 50, won: true, perfect: false, maxCombo: 3 }) }));
-    expect(r).toMatchObject({ played: 2, wins: 2, bestScore: 9000 + 5000 + 5000 + 600, maxCombo: 6 });
+    expect(r).toMatchObject({ played: 2, wins: 2, bestScore: 9000 + 5000 + 5000 + 600 });
     r = applyResult(r, runResult({ outcome: 'lose', score: sheetOf({ moves: 100, discs: 10, won: false, perfect: false, maxCombo: 0 }) }));
     expect(r).toMatchObject({ played: 3, losses: 1, bestScore: 9000 + 5000 + 5000 + 600 });
     r = applyResult(r, runResult({ outcome: 'draw' }));
@@ -27,8 +27,8 @@ describe('applyResult', () => {
 
 describe('sanitizeRecords', () => {
   test('壊れた値とありえない値は 0 にし、辻褄の合わない値を直す', () => {
-    const r = sanitizeRecords({ played: 1, wins: 3, losses: -1, perfect: 7, maxCombo: 61, bestScore: 1234.7 });
-    expect(r).toEqual({ played: 3, wins: 3, losses: 0, draws: 0, perfect: 3, bestScore: 1234, maxCombo: 0 });
+    const r = sanitizeRecords({ played: 1, wins: 3, losses: -1, perfect: 7, bestScore: 1234.7 });
+    expect(r).toEqual({ played: 3, wins: 3, losses: 0, draws: 0, perfect: 3, bestScore: 1234 });
     expect(sanitizeRecords({})).toEqual(emptyRecords());
   });
 });

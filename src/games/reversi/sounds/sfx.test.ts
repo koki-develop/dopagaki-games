@@ -21,7 +21,7 @@ const CALLS: [string, (s: ReversiSfx, i: number) => void][] = [
   ['flipStep human', (s, i) => s.flipStep('human', i, 1 + (i % 4), i % 5)],
   ['flipStep cpu', (s, i) => s.flipStep('cpu', i, 1 + (i % 4), 0)],
   ['burst', (s, i) => s.burst(2 + (i % 3))],
-  ['inhale', (s) => s.inhale(0.3)],
+  ['drumRoll', (s) => s.drumRoll(0.3)],
   ['gatherLift rising', (s) => s.gatherLift(0.35, true)],
   ['gatherLift flat', (s) => s.gatherLift(0.35, false)],
   ['dread', (s, i) => s.dread((i % 5) / 4)],
@@ -167,10 +167,10 @@ describe('ReversiSfx', () => {
     expect(risingEvents((s) => s.gatherLift(0.35, true))).toBeGreaterThan(0);
   });
 
-  test('溜めの吸い込む音は、止めるとすぐに音量を下げ、音源を止める', () => {
+  test('溜めのドラムロールは、止めるとすぐに音量を下げ、まだ鳴らしていない打音も含めて音源を止める', () => {
     const { ctx, sfx } = setup();
     const sources = ctx.sources.length;
-    const handle = sfx.inhale(0.45);
+    const handle = sfx.drumRoll(0.45);
     const mine = ctx.sources.slice(sources);
     expect(mine.length).toBeGreaterThan(0);
     ctx.currentTime = 0.1;

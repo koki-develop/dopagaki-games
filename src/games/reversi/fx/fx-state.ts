@@ -1,6 +1,6 @@
+import { PRESENT_LONG_AGO } from '../../../juice/frame-time.ts';
 import { RIPPLE, SHOCKWAVE } from '../config.ts';
 import { LOOK } from '../view/look.ts';
-import { LONG_AGO } from './discs.ts';
 
 /**
  * 演出の状態。1 回のプレイごとに作り直し、描画側が毎フレームそのまま uniform に写す。three.js に依存しない素の値だけを持つ。
@@ -72,23 +72,23 @@ export type FxState = {
   lastAt: number;
 };
 
-/** 何も起きていない 4 値ずつの記録（開始時刻が LONG_AGO、4 つ目は idle） */
+/** 何も起きていない 4 値ずつの記録（開始時刻が PRESENT_LONG_AGO、4 つ目は idle） */
 function idleSlots(slots: number, idle: number): Float32Array {
   const r = new Float32Array(slots * 4);
   for (let i = 0; i < slots; i++) {
-    r[i * 4 + 2] = LONG_AGO;
+    r[i * 4 + 2] = PRESENT_LONG_AGO;
     r[i * 4 + 3] = idle;
   }
   return r;
 }
 
-/** 何も起きていない波紋の記録（開始時刻が LONG_AGO、強さ 0） */
+/** 何も起きていない波紋の記録（開始時刻が PRESENT_LONG_AGO、強さ 0） */
 export const createRipples = (): Float32Array => idleSlots(RIPPLE.slots, 0);
 
-/** 衝撃波が出ていないときの速さ（u / 秒）。開始時刻が LONG_AGO なので、この値で輪は見えない */
+/** 衝撃波が出ていないときの速さ（u / 秒）。開始時刻が PRESENT_LONG_AGO なので、この値で輪は見えない */
 const SHOCK_SPEED_IDLE = 12;
 
-/** 何も起きていない衝撃波の記録（開始時刻が LONG_AGO） */
+/** 何も起きていない衝撃波の記録（開始時刻が PRESENT_LONG_AGO） */
 export const createShockwaves = (): Float32Array => idleSlots(SHOCKWAVE.slots, SHOCK_SPEED_IDLE);
 
 /** 何も起きていない演出の状態 */
@@ -101,7 +101,7 @@ export function createFxState(): FxState {
     hitShake: 0,
     impactX: 0,
     impactY: 0,
-    impactAt: LONG_AGO,
+    impactAt: PRESENT_LONG_AGO,
     impactStrength: 0,
     aberration: 0,
     aberrationAngle: 0,
@@ -128,6 +128,6 @@ export function createFxState(): FxState {
     boardAppear: 1,
     lastX: 0,
     lastY: 0,
-    lastAt: LONG_AGO,
+    lastAt: PRESENT_LONG_AGO,
   };
 }

@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'bun:test';
+import { PRESENT_LONG_AGO } from '../../../juice/frame-time.ts';
 import { CEREMONY, CEREMONY_MOTION, flipTier, hitStopFor, SLOW_MO, WARP_ARRIVE } from '../config.ts';
 import { cellX, cellY } from '../geometry.ts';
 import { runResult, sheetOf } from '../result.test-support.ts';
 import { BLACK, countOf, parseSquare, positionFromRows, WHITE } from '../rules/position.ts';
 import type { RunResult } from '../types.ts';
 import { LOOK } from '../view/look.ts';
-import { DISC_OFFSET, DISC_STRIDE, LONG_AGO } from './discs.ts';
+import { DISC_OFFSET, DISC_STRIDE } from './discs.ts';
 import { DirectorKit } from './test-kit.test-support.ts';
 
 /** 黒が a2 に打つと 14 枚返る局面 */
@@ -106,7 +107,7 @@ describe('Director の着手の演出', () => {
     const [duration, , delay] = silence[0].args as number[];
     expect(delay).toBeGreaterThan(0);
     expect(delay + duration).toBeCloseTo(hitStopFor(14, false) + (choreo.waveAt - choreo.landAt), 9);
-    expect(kit.rec.calls('sfx.inhale')[0].args[0]).toBeCloseTo(delay + duration, 9);
+    expect(kit.rec.calls('sfx.drumRoll')[0].args[0]).toBeCloseTo(delay + duration, 9);
     // スローモーションの間は、世界時間が実時間より遅く進む
     expect(kit.ft.real).toBeGreaterThan(kit.ft.world);
     expect(kit.rec.count('vibrate')).toBeGreaterThan(0);
@@ -283,7 +284,7 @@ describe('Director の時間割', () => {
       'flash.request',
       'vibrate',
       'audio.silence',
-      'sfx.inhale',
+      'sfx.drumRoll',
       'sfx.burst',
       'flash.request',
       'vibrate',
@@ -379,7 +380,7 @@ describe('Director の終局の儀式', () => {
     const out: [number, number][] = [];
     for (let s = 0; s < 64; s++) {
       const at = kit.discs.data[s * DISC_STRIDE + DISC_OFFSET.dimAt];
-      if (at > LONG_AGO) out.push([s, at]);
+      if (at > PRESENT_LONG_AGO) out.push([s, at]);
     }
     return out;
   };
@@ -395,7 +396,7 @@ describe('Director の終局の儀式', () => {
       ['human', 2, true, true],
     ]);
     expect(kit.rec.calls('sfx.verdict').map((c) => c.args)).toEqual([['win', false]]);
-    expect(kit.rec.count('sfx.inhale')).toBe(1);
+    expect(kit.rec.count('sfx.drumRoll')).toBe(1);
     expect(kit.particles.count).toBeGreaterThan(0);
     expect(kit.finished).toBe(1);
     expect([kit.hud.black, kit.hud.white]).toEqual([3, 2]);
@@ -467,7 +468,7 @@ describe('Director の終局の儀式', () => {
     kit.until(30);
     const waves: [number, number][] = [];
     const w = kit.fx.shockwaves;
-    for (let i = 0; i < w.length / 4; i++) if (w[i * 4 + 2] > LONG_AGO) waves.push([w[i * 4 + 2], w[i * 4 + 3]]);
+    for (let i = 0; i < w.length / 4; i++) if (w[i * 4 + 2] > PRESENT_LONG_AGO) waves.push([w[i * 4 + 2], w[i * 4 + 3]]);
     waves.sort((a, b) => a[0] - b[0]);
     const verdictAt = waves[0][0];
     expect(waves.map(([, speed]) => speed)).toEqual([CEREMONY_MOTION.win.shockSpeed, CEREMONY_MOTION.perfect.shockSpeed, CEREMONY_MOTION.wave.shockSpeed]);
@@ -484,7 +485,7 @@ describe('Director の終局の儀式', () => {
     }
     expect(kit.rec.calls('sfx.verdict').map((c) => c.args)).toEqual([['lose', false]]);
     expect(kit.rec.count('audio.silence')).toBe(1);
-    expect(kit.rec.count('sfx.inhale')).toBe(0);
+    expect(kit.rec.count('sfx.drumRoll')).toBe(0);
     expect(kit.rec.count('sfx.swoosh')).toBe(0);
     // 儀式の音は、どれも上がらない版（最後の引数 rising が false）
     for (const name of ['sfx.gatherLift', 'sfx.countTick']) {
@@ -520,7 +521,7 @@ describe('Director の終局の儀式', () => {
     const kit = ending(draw, ['XX......', 'OO......', '........', '........', '........', '........', '........', '........']);
     kit.until(30);
     expect(kit.rec.calls('sfx.verdict').map((c) => c.args)).toEqual([['draw', false]]);
-    expect([kit.rec.count('audio.silence'), kit.rec.count('sfx.inhale'), kit.rec.count('flash.request'), kit.rec.count('vibrate')]).toEqual([1, 0, 0, 0]);
+    expect([kit.rec.count('audio.silence'), kit.rec.count('sfx.drumRoll'), kit.rec.count('flash.request'), kit.rec.count('vibrate')]).toEqual([1, 0, 0, 0]);
     for (const name of ['sfx.gatherLift', 'sfx.countTick']) for (const c of kit.rec.calls(name)) expect(c.args.at(-1)).toBe(false);
     expect(kit.particles.count).toBe(0);
     expect(dimmed(kit)).toEqual([]);
@@ -556,13 +557,13 @@ describe('Director の終局の儀式', () => {
     expect(dimmed(even)).toEqual([]);
   });
 
-  test('溜めの間に飛ばすと、数えきった状態ですぐに終わり、溜めの無音と吸い込む音を止める', () => {
+  test('溜めの間に飛ばすと、数えきった状態ですぐに終わり、溜めの無音とドラムロールを止める', () => {
     const r = win();
     const kit = ending(r, HUMAN_AHEAD);
     for (let i = 0; i < 60 * 20 && kit.rec.count('audio.silence') === 0; i++) kit.frame();
-    expect([kit.rec.count('audio.silence'), kit.rec.count('sfx.inhale')]).toEqual([1, 1]);
+    expect([kit.rec.count('audio.silence'), kit.rec.count('sfx.drumRoll')]).toEqual([1, 1]);
     expect(kit.director.skip()).toBe(true);
-    expect([kit.rec.count('audio.cancelSilence'), kit.rec.count('sfx.inhale.stop')]).toEqual([1, 1]);
+    expect([kit.rec.count('audio.cancelSilence'), kit.rec.count('sfx.drumRoll.stop')]).toEqual([1, 1]);
     kit.director.hud(kit.hud);
     expect([kit.hud.black, kit.hud.white]).toEqual([3, 2]);
     // 飛ばしても、HUD の得点には石の点まで入る
@@ -570,12 +571,12 @@ describe('Director の終局の儀式', () => {
     expect(kit.director.skip()).toBe(false);
   });
 
-  test('溜めの前に飛ばすと、その後に無音も吸い込む音も始まらない', () => {
+  test('溜めの前に飛ばすと、その後に無音もドラムロールも始まらない', () => {
     const kit = ending(win(), HUMAN_AHEAD);
     kit.frame();
     expect(kit.director.skip()).toBe(true);
     for (let i = 0; i < 60 * 10; i++) kit.frame();
-    expect([kit.rec.count('audio.silence'), kit.rec.count('sfx.inhale'), kit.rec.count('sfx.verdict')]).toEqual([0, 0, 0]);
+    expect([kit.rec.count('audio.silence'), kit.rec.count('sfx.drumRoll'), kit.rec.count('sfx.verdict')]).toEqual([0, 0, 0]);
   });
 
   test('儀式を始めると、フィーバーの光を止める', () => {

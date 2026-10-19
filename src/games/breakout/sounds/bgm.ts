@@ -37,6 +37,7 @@ export const BREAKOUT_ARRANGEMENT: Arrangement = {
     return 1;
   },
   // 層は数秒かけてフェードで出し入れし、段階が変わった瞬間を目立たせない
+  room: null,
   layerTau: () => 1.2,
   play: (step, _time, tier, voice) => {
     const inBar = step % STEPS_PER_BAR;

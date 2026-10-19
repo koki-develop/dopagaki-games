@@ -1,6 +1,6 @@
 import { uniform, uniformArray } from 'three/tsl';
 import * as THREE from 'three/webgpu';
-import { LONG_AGO } from '../fx/discs.ts';
+import { PRESENT_LONG_AGO } from '../../../juice/frame-time.ts';
 import { RIPPLE, SHOCKWAVE } from '../config.ts';
 import { createRipples, createShockwaves } from '../fx/fx-state.ts';
 
@@ -26,7 +26,7 @@ export function createViewUniforms() {
     /** ヒットストップで止めた石の震え: 中心 x, y、強さ */
     hit: uniform(new THREE.Vector3(0, 0, 0)),
     /** 集中線: 中心 x, y、始めた実時間、強さ */
-    impact: uniform(new THREE.Vector4(0, 0, LONG_AGO, 0)),
+    impact: uniform(new THREE.Vector4(0, 0, PRESENT_LONG_AGO, 0)),
     beat: uniform(0),
     intensity: uniform(0),
     hue: uniform(0),
@@ -47,7 +47,7 @@ export function createViewUniforms() {
     /** 押している・ホバーしているマス: x, y, 強さ, 打てるか（1 / 0） */
     hover: uniform(new THREE.Vector4(0, 0, 0, 0)),
     /** 最後に打ったマス: x, y, 打った時刻 */
-    lastMove: uniform(new THREE.Vector3(0, 0, LONG_AGO)),
+    lastMove: uniform(new THREE.Vector3(0, 0, PRESENT_LONG_AGO)),
     /** 合法手の印と押している間の予告の色相（人の石の縁の色） */
     markerHue: uniform(0),
   };

@@ -203,6 +203,46 @@ export function riserInhale(v: Voice, t: number, duration: number, shape: Inhale
   oscillator(v, t, 'sine', shape.toneFrom, end, og).frequency.exponentialRampToValueAtTime(shape.toneTo, end);
 }
 
+/** ドラムロール（drumRoll）の音色 */
+export type DrumRollShape = {
+  /** スネアの胴の音程と、響き線のノイズを通すバンドパスの中心周波数（Hz） */
+  readonly snareBody: number;
+  readonly snareWire: number;
+  /** 下で転がすティンパニの音程（Hz） */
+  readonly timpani: number;
+  /** 1 秒あたりに打つ数の、始まりと終わり（だんだん細かくする） */
+  readonly rateFrom: number;
+  readonly rateTo: number;
+};
+
+/** ドラムロールの音量の、始まりの大きさ（終わりを 1 として） */
+const ROLL_START = 0.2;
+
+/**
+ * 溜めのドラムロール。t から duration 秒、スネアを左右交互に打つ間隔をだんだん細かくし、音量を上げていき、終わりの瞬間に途切れる。
+ * 下でティンパニを半分の速さで転がして、低いうなりを重ねる。打つたびに強さとノイズの読み出し位置を揺らす
+ */
+export function drumRoll(v: Voice, t: number, duration: number, shape: DrumRollShape, dest: AudioNode = v.out): void {
+  const ctx = v.ctx;
+  const end = t + duration;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(ROLL_START, t);
+  g.gain.exponentialRampToValueAtTime(1, Math.max(t + 0.001, end - 0.012));
+  g.gain.linearRampToValueAtTime(SILENT, end);
+  g.connect(dest);
+  let at = t;
+  let stroke = 0;
+  while (at < end - 0.01) {
+    const accent = (stroke % 2 === 0 ? 1 : 0.78) * (0.85 + Math.random() * 0.3);
+    noise(v, at, 'bandpass', shape.snareWire * 2 ** (jitterCents(80) / 1200), 0.9, 0.0008, 0.055, 0.5 * accent, Math.random(), g);
+    tone(v, at, 'triangle', shape.snareBody * 2 ** (jitterCents(30) / 1200), 0.0008, 0.035, 0.22 * accent, g);
+    if (stroke % 2 === 0) tone(v, at, 'sine', shape.timpani * 2 ** (jitterCents(15) / 1200), 0.003, 0.22, 0.32 * accent, g);
+    const k = (at - t) / duration;
+    at += 1 / (shape.rateFrom + (shape.rateTo - shape.rateFrom) * k);
+    stroke++;
+  }
+}
+
 /**
  * voice の出力を、amount の量だけ共通の残響へ送る。voice を止めると送りも止まる（残響の尾は残る）。
  * 送りは voice が鳴り終わったら残響から切り離す。

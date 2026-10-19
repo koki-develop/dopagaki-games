@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { ParticlesView } from '../../../engine/particles.ts';
 import type { PostChain } from '../../../engine/post.ts';
-import { ScreenFlash } from '../../../engine/screen-fx.ts';
+import { ImpactLines, ScreenFlash } from '../../../engine/screen-fx.ts';
 import type { CameraOffset } from '../../../juice/camera.ts';
 import type { FrameTime } from '../../../juice/frame-time.ts';
 import type { DiscField } from '../fx/discs.ts';
@@ -12,12 +12,13 @@ import { BOARD_SIZE } from '../rules/position.ts';
 import { BackgroundView } from './background.ts';
 import { BoardView } from './board.ts';
 import { DiscsView } from './discs.ts';
-import { ImpactView } from './impact.ts';
 import { LOOK } from './look.ts';
 import { createViewUniforms } from './uniforms.ts';
 import type { ViewUniforms } from './uniforms.ts';
 
 const PARTICLE_CAPACITY = 5000;
+/** 集中線の内側の端が、画面の外から寄ってくる距離（ワールド単位。1 マスは 1） */
+const IMPACT_REACH = { from: 11, to: 2.4 } as const;
 const HALF = BOARD_SIZE / 2;
 
 /** bloom の強さと RGB のずれを受け取る先。本番では PostChain */
@@ -38,7 +39,7 @@ export class ReversiView {
   readonly board: BoardView;
   readonly discs: DiscsView;
   readonly particles: ParticlesView;
-  readonly impact: ImpactView;
+  readonly impact: ImpactLines;
   readonly flash: ScreenFlash;
   private post: PostTarget | null = null;
   private bloomStrength: number = LOOK.bloom.base;
@@ -50,7 +51,7 @@ export class ReversiView {
     this.board = new BoardView(u);
     this.discs = new DiscsView(u);
     this.particles = new ParticlesView({ capacity: PARTICLE_CAPACITY, time: u.time, brightness: LOOK.particles, renderOrder: 30 });
-    this.impact = new ImpactView(u);
+    this.impact = new ImpactLines({ real: u.real, impact: u.impact, reachFrom: IMPACT_REACH.from, reachTo: IMPACT_REACH.to, brightness: LOOK.impactLines, renderOrder: 85 });
     this.flash = new ScreenFlash({ level: u.flash, renderOrder: 100 });
     for (const m of [this.background, this.board, this.discs, this.particles, this.impact, this.flash]) this.scene.add(m.mesh);
     this.camera.position.set(HALF, HALF, 5);

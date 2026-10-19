@@ -37,6 +37,12 @@ export const GAMES = [
     title: 'リバーシ',
     description: 'ドパガキのためのリバーシです。',
   },
+  {
+    id: 'blackjack',
+    path: '/blackjack',
+    title: 'ブラックジャック',
+    description: 'ドパガキのためのブラックジャックです。',
+  },
 ] as const satisfies readonly (PageMeta & { id: string })[];
 
 export const PAGES = [PORTAL, ...GAMES] as const;

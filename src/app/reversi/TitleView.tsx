@@ -71,10 +71,6 @@ export default function TitleView({ records, setup, onChooseSide, onStart, onSet
           <dd>{formatScore(records.bestScore)}</dd>
         </div>
         <div>
-          <dt>MAX COMBO</dt>
-          <dd>{records.maxCombo}</dd>
-        </div>
-        <div>
           <dt>対局</dt>
           <dd>{recordText(records)}</dd>
         </div>

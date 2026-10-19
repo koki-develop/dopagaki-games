@@ -44,6 +44,7 @@ export const REVERSI_ARRANGEMENT: Arrangement = {
     if (layer === ARP) return tier >= 2 ? 1 : 0;
     return 1;
   },
+  room: null,
   layerTau: () => 1.2,
   play: (step, _time, tier, voice) => {
     const inBar = step % STEPS_PER_BAR;

@@ -10,7 +10,7 @@ import type { MatchSetup } from './types.ts';
 
 export const RECORDS_KEY = 'dopagaki:reversi:records';
 /** 保存する形式の版。形式を変えるときは上げる。版の違う保存内容は捨てる */
-const VERSION = 1;
+const VERSION = 2;
 
 type StoreOptions = {
   storage: StorageLike | null;

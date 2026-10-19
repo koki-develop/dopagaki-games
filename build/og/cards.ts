@@ -1,5 +1,6 @@
 import type { PageId } from '../../src/app/site.ts';
 import type { OgCard } from './card.ts';
+import { blackjackCard } from './cards/blackjack.tsx';
 import { breakoutCard } from './cards/breakout.tsx';
 import { portalCard } from './cards/portal.tsx';
 import { reversiCard } from './cards/reversi.tsx';
@@ -9,4 +10,5 @@ export const OG_CARDS: Readonly<Record<PageId, OgCard>> = {
   portal: portalCard,
   breakout: breakoutCard,
   reversi: reversiCard,
+  blackjack: blackjackCard,
 };

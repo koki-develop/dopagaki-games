@@ -1,8 +1,8 @@
 import { NO_SOUND, voiceHandle } from '../../../juice/audio/engine.ts';
 import type { AudioEngine, Bus, SoundHandle, Voice, VoiceGroup, VoicePriority } from '../../../juice/audio/engine.ts';
 import { pentatonicSemitones } from '../../../juice/audio/shepard.ts';
-import { DEFAULT_Q, drive, envGain, glide, jitterCents, midiToFreq, noise, oscillator, riserInhale, send, shepardPluck, stopTime, supersaw, tone } from '../../../juice/audio/synth.ts';
-import type { InhaleShape } from '../../../juice/audio/synth.ts';
+import { DEFAULT_Q, drive, drumRoll, envGain, glide, jitterCents, midiToFreq, noise, oscillator, send, shepardPluck, stopTime, supersaw, tone } from '../../../juice/audio/synth.ts';
+import type { DrumRollShape } from '../../../juice/audio/synth.ts';
 import { VoiceOpener } from '../../../juice/audio/voices.ts';
 import type { Side } from '../types.ts';
 
@@ -31,8 +31,8 @@ const CORNER_CHORD = [52, 59, 64, 68, 71, 76] as const;
 const NEW_BEST_CHORD = [52, 59, 64, 68, 71, 76, 80, 83] as const;
 /** CPU の大きな手の不穏な和音（短 2 度を含む） */
 const DREAD_MIDI = [28, 35, 40, 41] as const;
-/** 溜めの吸い込む音の音色 */
-const INHALE: InhaleShape = { noiseFrom: 300, noiseTo: 6500, toneFrom: 160, toneTo: 1300, toneLevel: 0.3 };
+/** 溜めのドラムロールの音色 */
+const ROLL: DrumRollShape = { snareBody: 200, snareWire: 3600, timpani: 70, rateFrom: 18, rateTo: 36 };
 /** 確定石の結晶の音の高さの候補（基準の音からの半音） */
 const STABLE_STEPS = [0, 3, 7] as const;
 /** 金属の打撃の倍音（整数比にならない比で、鐘や金床らしくする） */
@@ -157,13 +157,13 @@ export class ReversiSfx {
   }
 
   /**
-   * 溜め（大きな手の返り始める前と、終局の決着の前）。duration 秒かけて上がり、終わりの瞬間に途切れる。
+   * 溜めのドラムロール（大きな手の返り始める前と、終局の決着の前）。duration 秒かけて細かく大きくなり、終わりの瞬間に途切れる。
    * ほかの音を消した無音の中で鳴らすので、lead の経路で鳴らす。途中で止めるときは、返した口の stop を呼ぶ
    */
-  inhale(duration: number): SoundHandle {
-    const v = this.open(duration + 0.02, 0.8, 'event', 'lead');
+  drumRoll(duration: number): SoundHandle {
+    const v = this.open(duration + 0.25, 0.8, 'event', 'lead');
     if (!v) return NO_SOUND;
-    riserInhale(v, v.start, duration, INHALE);
+    drumRoll(v, v.start, duration, ROLL);
     return voiceHandle(v);
   }
 

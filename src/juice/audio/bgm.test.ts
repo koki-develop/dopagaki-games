@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { LayeredBgm } from './bgm.ts';
-import type { Arrangement } from './bgm.ts';
+import type { Arrangement, BgmRoom } from './bgm.ts';
 import { AudioEngine } from './engine.ts';
 import { MockAudioContext } from './mock-audio.test-support.ts';
 import type { MockFilter, MockGain, MockParam, MockSource } from './mock-audio.test-support.ts';
@@ -25,12 +25,13 @@ class FakeTimer implements IntervalTimer {
 const LAYERS = 2;
 
 /** 層 0 は常に鳴り、層 1 は段階 1 以上で入る。拍の頭で層 0、裏で層 1 を鳴らす。鳴らしたステップを steps に残す */
-const arrangement = (steps: number[]): Arrangement => ({
+const arrangement = (steps: number[], room: BgmRoom | null): Arrangement => ({
   bpm: 120,
   stepsPerBeat: 2,
   layerCount: LAYERS,
   layerLevel: (layer, tier) => (layer === 0 ? 1 : tier >= 1 ? 0.8 : 0),
   layerTau: () => 1,
+  room,
   play: (step, _time, _tier, voice) => {
     steps.push(step);
     const v = voice(0.2, 1, step % 2);
@@ -57,13 +58,13 @@ function latestRiser(ctx: MockAudioContext): Riser | null {
   return { src, filter, gain: filter.outputs[0] as unknown as MockGain, osc, oscGain: osc.outputs[0] as unknown as MockGain };
 }
 
-function setup() {
+function setup(room: BgmRoom | null = null) {
   const ctx = new MockAudioContext();
   const engine = new AudioEngine(() => ctx.asContext());
   engine.unlock();
   const timer = new FakeTimer();
   const steps: number[] = [];
-  const bgm = new LayeredBgm(engine, arrangement(steps), timer);
+  const bgm = new LayeredBgm(engine, arrangement(steps, room), timer);
   /** 時計を seconds 秒進めながら、25ms ごとにシーケンサーを動かす */
   const run = (seconds: number) => {
     const end = ctx.currentTime + seconds;
@@ -89,6 +90,29 @@ describe('LayeredBgm', () => {
     const { layers } = nodes();
     const outs = new Set(ctx.gains.filter((g) => layers.includes(g.outputs[0] as MockGain)).map((g) => g.outputs[0]));
     expect(outs.size).toBe(2);
+  });
+
+  test('部屋の響きを持つ曲は、送りのある層だけを ConvolverNode へ送り、響きを全体のフィルタへ戻す', () => {
+    const { bgm, run, nodes } = setup({ seconds: 0.5, level: 0.3, sends: [0, 0.4] });
+    bgm.start();
+    run(0.5);
+    const { filter, layers } = nodes();
+    expect(layers[0].outputs).toEqual([filter]);
+    const send = layers[1].outputs[1] as unknown as MockGain;
+    expect(send.gain.value).toBe(0.4);
+    const convolver = send.outputs[0] as unknown as { kind: string; buffer: { numberOfChannels: number; duration: number }; outputs: MockGain[] };
+    expect(convolver.kind).toBe('convolver');
+    expect(convolver.buffer.numberOfChannels).toBe(2);
+    expect(convolver.buffer.duration).toBeCloseTo(0.5, 3);
+    expect(convolver.outputs[0].gain.value).toBe(0.3);
+    expect(convolver.outputs[0].outputs).toEqual([filter]);
+  });
+
+  test('部屋の響きを持たない曲は、ConvolverNode を作らない', () => {
+    const { bgm, run, nodes } = setup();
+    bgm.start();
+    run(0.5);
+    for (const layer of nodes().layers) expect(layer.outputs).toHaveLength(1);
   });
 
   test('ライザーの音源は、setRiser を受け取るまで作らない', () => {
@@ -323,8 +347,8 @@ describe('LayeredBgm', () => {
     const engine = new AudioEngine(() => ctx.asContext());
     const timer = new FakeTimer();
     const steps: number[] = [];
-    const bgm = new LayeredBgm(engine, arrangement(steps), timer);
-    engine.unlock();
+    const bgm = new LayeredBgm(engine, arrangement(steps, null), timer);
+engine.unlock();
     bgm.start();
     for (let i = 0; i < 4; i++) timer.fn?.();
     expect(steps).toEqual([]);
@@ -339,7 +363,7 @@ describe('LayeredBgm', () => {
   test('AudioContext ができる前の設定も、ノードを作ったときに反映する', () => {
     const ctx = new MockAudioContext();
     const engine = new AudioEngine(() => ctx.asContext());
-    const bgm = new LayeredBgm(engine, arrangement([]), new FakeTimer());
+    const bgm = new LayeredBgm(engine, arrangement([], null), new FakeTimer());
     bgm.setTier(4);
     bgm.setRiser(0);
     bgm.setOpenness(0.99, 1);

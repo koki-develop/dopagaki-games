@@ -6,14 +6,14 @@ import { DISPLAY_FONT } from '../fonts.ts';
 const BG = 'rgb(2,1,8)';
 const CYAN = 'rgb(94,242,255)';
 
-/** 画像の全面を暗い地で覆い、中身を上下左右の中央に置く */
-export function Frame({ children }: { children: ReactNode }) {
+/** 画像の全面を地の色（既定はアプリの暗い地）で覆い、中身を上下左右の中央に置く */
+export function Frame({ children, background = BG }: { children: ReactNode; background?: string }) {
   return (
     <div
       style={{
         width: OG_WIDTH,
         height: OG_HEIGHT,
-        background: BG,
+        background,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',

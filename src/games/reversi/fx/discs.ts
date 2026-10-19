@@ -1,17 +1,10 @@
+import { PRESENT_FAR_AHEAD, PRESENT_LONG_AGO } from '../../../juice/frame-time.ts';
 import { cellX, cellY } from '../geometry.ts';
 import { hasSquare } from '../rules/bits.ts';
 import type { Bits } from '../rules/bits.ts';
 import { BLACK, discAt, SQUARES } from '../rules/position.ts';
 import type { Color, Position } from '../rules/position.ts';
 import type { PreviewFlip } from './choreo.ts';
-
-/**
- * present の時間軸で「十分に過去」と「十分に先」を表す時刻。起きていない出来事の時刻にする。
- * シェーダーの uniform（f32）に入るので、経過時間の指数的な減衰が 0 になりきり、
- * かつシェーダーが足す 0.1 秒ほどの幅が f32 で丸め消えない桁にする（smoothstep の両端が同じ値になると、結果が決まらない）
- */
-export const LONG_AGO = -1e4;
-export const FAR_AHEAD = 1e6;
 
 /** 石がどう落ちてきたか。落ち方の見た目を変える */
 export const DropKind = {
@@ -124,7 +117,7 @@ export class DiscField {
     const o = square * DISC_STRIDE;
     d[o + O.from] = color;
     d[o + O.to] = color;
-    d[o + O.flipStart] = LONG_AGO;
+    d[o + O.flipStart] = PRESENT_LONG_AGO;
     d[o + O.dropStart] = at;
     d[o + O.dropDur] = duration;
     d[o + O.dropKind] = kind;
@@ -174,7 +167,7 @@ export class DiscField {
       const o = s * DISC_STRIDE;
       if (on) {
         this.data[o + O.legalSince] = now;
-        this.data[o + O.legalUntil] = FAR_AHEAD;
+        this.data[o + O.legalUntil] = PRESENT_FAR_AHEAD;
       } else {
         this.data[o + O.legalUntil] = now;
       }
@@ -216,7 +209,7 @@ export class DiscField {
   /** 確定石になった。時刻 at から結晶のような光をまとう */
   stable(square: number, at: number): void {
     const o = square * DISC_STRIDE;
-    if (this.data[o + O.stableSince] !== LONG_AGO) return;
+    if (this.data[o + O.stableSince] !== PRESENT_LONG_AGO) return;
     this.data[o + O.stableSince] = at;
     this.version++;
   }
@@ -268,24 +261,24 @@ export class DiscField {
     const o = s * DISC_STRIDE;
     d[o + O.from] = c;
     d[o + O.to] = c;
-    d[o + O.flipStart] = LONG_AGO;
+    d[o + O.flipStart] = PRESENT_LONG_AGO;
     d[o + O.flipDur] = 0.3;
     d[o + O.spins] = 0;
     d[o + O.lift] = 0;
     d[o + O.dirX] = 1;
     d[o + O.dirY] = 0;
-    d[o + O.dropStart] = LONG_AGO;
+    d[o + O.dropStart] = PRESENT_LONG_AGO;
     d[o + O.dropDur] = 0;
     d[o + O.dropKind] = DropKind.None;
     d[o + O.moveFromX] = d[o + O.x];
     d[o + O.moveFromY] = d[o + O.y];
-    d[o + O.moveStart] = LONG_AGO;
-    d[o + O.legalSince] = LONG_AGO;
-    d[o + O.legalUntil] = LONG_AGO;
-    d[o + O.previewSince] = LONG_AGO;
-    d[o + O.stableSince] = LONG_AGO;
+    d[o + O.moveStart] = PRESENT_LONG_AGO;
+    d[o + O.legalSince] = PRESENT_LONG_AGO;
+    d[o + O.legalUntil] = PRESENT_LONG_AGO;
+    d[o + O.previewSince] = PRESENT_LONG_AGO;
+    d[o + O.stableSince] = PRESENT_LONG_AGO;
     d[o + O.previewKind] = PreviewKind.None;
-    d[o + O.countedAt] = LONG_AGO;
-    d[o + O.dimAt] = LONG_AGO;
+    d[o + O.countedAt] = PRESENT_LONG_AGO;
+    d[o + O.dimAt] = PRESENT_LONG_AGO;
   }
 }

@@ -1,10 +1,17 @@
 import { clamp01 } from '../../shared/math.ts';
 import type { AudioEngine, Voice, VoiceGroup, VoiceRequest } from './engine.ts';
+import { roomImpulse } from './pluck.ts';
 import { Sequencer } from './sequencer.ts';
 import type { IntervalTimer } from './sequencer.ts';
 
 /** ステップの音を鳴らす枠を確保する。時刻はそのステップの時刻、つなぎ先は層 layer */
 export type StepVoice = (duration: number, gain: number, layer: number) => Voice | null;
+
+/**
+ * 部屋の響き。層 i から sends[i] の量を送り、長さ seconds（−60 dB まで）のインパルス応答で響かせて、level の音量で全体のフィルタへ戻す。
+ * 効果音の共通の残響とは別に持つので、効果音を消す無音（silence）でも曲の響きは途切れない
+ */
+export type BgmRoom = { readonly seconds: number; readonly level: number; readonly sends: readonly number[] };
 
 /**
  * 曲の中身。LayeredBgm がステップごとに play を呼ぶ。
@@ -20,6 +27,8 @@ export interface Arrangement {
   layerTau(layer: number): number;
   /** ステップ step（時刻 time）の音を予約する。音の枠は voice で確保する */
   play(step: number, time: number, tier: number, voice: StepVoice): void;
+  /** 部屋の響き。null なら付けない */
+  readonly room: BgmRoom | null;
 }
 
 const FILTER_OPEN = 18000;
@@ -46,6 +55,8 @@ const FILTER_EPSILON = 1e-4;
 type BgmNodes = {
   filter: BiquadFilterNode;
   layers: GainNode[];
+  /** 部屋の響き（層からの送り、ConvolverNode、戻り）。曲が響きを持たなければ空 */
+  room: AudioNode[];
 };
 
 /** ライザーのノード。使い始めたときに作り、restart() で止めて捨てる */
@@ -254,7 +265,7 @@ export class LayeredBgm {
       disconnectRiser(r);
     }
     if (!n) return;
-    for (const node of [...n.layers, n.filter]) node.disconnect();
+    for (const node of [...n.layers, ...n.room, n.filter]) node.disconnect();
   }
 
   /** 開き具合とライザーの高まりから決まる、全体のフィルタの周波数。低いほうに従う */
@@ -303,7 +314,7 @@ export class LayeredBgm {
       g.connect(filter);
       layers.push(g);
     }
-    this.nodes = { filter, layers };
+    this.nodes = { filter, layers, room: buildRoom(ctx, this.arr.room, layers, filter) };
     // AudioContext ができる前に受け取った状態を反映する
     for (let i = 0; i < layers.length; i++) setNow(layers[i].gain, this.arr.layerLevel(i, this.tier), t);
     this.filterTarget = this.filterFreq();
@@ -374,6 +385,31 @@ export class LayeredBgm {
     this.stepTime = time;
     this.arr.play(step, time, this.tier, this.voiceAt);
   }
+}
+
+/** 部屋の響きのノードを作り、層から送って filter へ戻す。room が null なら何も作らない */
+function buildRoom(ctx: BaseAudioContext, room: BgmRoom | null, layers: readonly GainNode[], filter: AudioNode): AudioNode[] {
+  if (!room) return [];
+  const rate = ctx.sampleRate;
+  const ir = ctx.createBuffer(2, Math.ceil(rate * room.seconds), rate);
+  roomImpulse([ir.getChannelData(0), ir.getChannelData(1)], rate, room.seconds);
+  const convolver = ctx.createConvolver();
+  convolver.buffer = ir;
+  const out = ctx.createGain();
+  out.gain.value = room.level;
+  convolver.connect(out);
+  out.connect(filter);
+  const nodes: AudioNode[] = [convolver, out];
+  layers.forEach((layer, i) => {
+    const amount = room.sends[i] ?? 0;
+    if (amount <= 0) return;
+    const send = ctx.createGain();
+    send.gain.value = amount;
+    layer.connect(send);
+    send.connect(convolver);
+    nodes.push(send);
+  });
+  return nodes;
 }
 
 function disconnectRiser(r: RiserNodes): void {

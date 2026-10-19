@@ -1,13 +1,8 @@
+import { PRESENT_LONG_AGO } from '../../../juice/frame-time.ts';
 import { LOOK } from '../view/look.ts';
 
 /** 壁に当たった記録を覚えておく数。古いものから上書きする */
 export const WALL_HIT_SLOTS = 8;
-
-/**
- * present の時間軸で「十分に過去」を表す時刻。衝撃波や壁の揺れの開始時刻の初期値にして、何も見せない。
- * シェーダーの uniform（f32）に入るので、経過時間の指数的な減衰が 0 になりきる範囲で、桁の大きすぎない値にする
- */
-export const PRESENT_LONG_AGO = -1e4;
 
 /** 衝撃波が出ていないときの速さ（u / 秒）。開始時刻が PRESENT_LONG_AGO なので、この値で輪は見えない */
 export const SHOCK_SPEED_IDLE = 14;

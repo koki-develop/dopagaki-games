@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { uniform, uniformArray } from 'three/tsl';
-import { createWallHits, PRESENT_LONG_AGO, SHOCK_SPEED_IDLE, WALL_HIT_SLOTS } from '../fx/fx-state.ts';
+import { PRESENT_LONG_AGO } from '../../../juice/frame-time.ts';
+import { createWallHits, SHOCK_SPEED_IDLE, WALL_HIT_SLOTS } from '../fx/fx-state.ts';
 
 /**
  * 全シェーダーで共有する uniform。値を書くのは BreakoutView.apply だけで、演出の状態（FxState）と設定から決まる倍率を毎フレーム写す。

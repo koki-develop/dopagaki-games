@@ -8,9 +8,11 @@
  */
 export const PURE_MODULES: readonly string[] = [
   'src/shared/',
+  'src/juice/frame-time.ts',
   'src/app/site.ts',
   'src/app/game/result-best.ts',
   'src/app/reversi/summary.ts',
+  'src/app/blackjack/summary.ts',
   'src/games/breakout/config.ts',
   'src/games/breakout/controller.ts',
   'src/games/breakout/hud/layout.ts',
@@ -35,8 +37,22 @@ export const PURE_MODULES: readonly string[] = [
   'src/games/reversi/stable-tracker.ts',
   'src/games/reversi/types.ts',
   'src/games/reversi/fx/choreo.ts',
-  'src/games/reversi/fx/cue-queue.ts',
   'src/games/reversi/fx/score-ticker.ts',
+  'src/games/blackjack/rules/',
+  'src/games/blackjack/strategy/',
+  'src/games/blackjack/config.ts',
+  'src/games/blackjack/controller.ts',
+  'src/games/blackjack/denominations.ts',
+  'src/games/blackjack/geometry.ts',
+  'src/games/blackjack/hud/layout.ts',
+  'src/games/blackjack/hud/model.ts',
+  'src/games/blackjack/records-model.ts',
+  'src/games/blackjack/scoring.ts',
+  'src/games/blackjack/session-state.ts',
+  'src/games/blackjack/streak.ts',
+  'src/games/blackjack/table.ts',
+  'src/games/blackjack/types.ts',
+  'src/games/blackjack/fx/tension.ts',
 ];
 
 const isDirectory = (path: string): boolean => path.endsWith('/');

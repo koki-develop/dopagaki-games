@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { uniform, vec2 } from 'three/tsl';
+import { Vector4 } from 'three/webgpu';
 import type * as THREE from 'three/webgpu';
 import { reversedSmoothsteps, unguardedPows } from './node-graph.test-support.ts';
 import { ParticlesView } from './particles.ts';
-import { FocusVignette, ScreenFlash } from './screen-fx.ts';
+import { FocusVignette, ImpactLines, ScreenFlash } from './screen-fx.ts';
 
 type NodeMaterial = THREE.MeshBasicNodeMaterial;
 
@@ -21,6 +22,7 @@ describe('engine のシェーダー', () => {
       new ParticlesView({ capacity: 8, time: uniform(0), brightness: 1, renderOrder: 0, attract: { point: vec2(0, 0), amount: uniform(0) } }).mesh,
     ],
     ['ScreenFlash', new ScreenFlash({ level: uniform(0), renderOrder: 0 }).mesh],
+    ['ImpactLines', new ImpactLines({ real: uniform(0), impact: uniform(new Vector4()), reachFrom: 11, reachTo: 2.4, brightness: 1, renderOrder: 0 }).mesh],
     [
       'FocusVignette',
       new FocusVignette({ strength: uniform(0), focus: vec2(0, 0), outerRadius: 4, innerRadius: 1, band: 1, darkness: 0.8, renderOrder: 0 }).mesh,

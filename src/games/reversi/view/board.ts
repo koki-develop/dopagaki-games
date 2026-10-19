@@ -2,8 +2,8 @@ import { abs, clamp, exp, float, Fn, fract, fwidth, If, Loop, max, min, mix, pos
 import * as THREE from 'three/webgpu';
 import type { Node } from 'three/webgpu';
 import { neon, sdRoundBox } from '../../../engine/tsl.ts';
+import { PRESENT_LONG_AGO } from '../../../juice/frame-time.ts';
 import { RIPPLE } from '../config.ts';
-import { LONG_AGO } from '../fx/discs.ts';
 import { BOARD_FRAME } from '../geometry.ts';
 import { BOARD_SIZE } from '../rules/position.ts';
 import { LOOK } from './look.ts';
@@ -109,7 +109,7 @@ export class BoardView {
       surface.addAssign(hoverCol.mul(cellGlow(u.hover.x, u.hover.y).mul(u.hover.z).mul(LOOK.board.cursor)));
       const lastAge = t.sub(u.lastMove.z);
       // まだ打っていないとき（時刻が十分に過去）は光らせない
-      const played = step(LONG_AGO / 2, u.lastMove.z);
+      const played = step(PRESENT_LONG_AGO / 2, u.lastMove.z);
       const lastGlow = cellGlow(u.lastMove.x, u.lastMove.y).mul(exp(lastAge.mul(-1.4)).mul(0.8).add(0.18)).mul(step(0, lastAge)).mul(played).mul(LOOK.board.lastMove);
       surface.addAssign(lineCol.mul(lastGlow));
 
