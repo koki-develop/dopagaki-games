@@ -71,7 +71,7 @@ export default function TitleView({ records, setup, onChooseSide, onStart, onSet
           <dd>{formatScore(records.bestScore)}</dd>
         </div>
         <div>
-          <dt>対局</dt>
+          <dt className="label-ja">対局</dt>
           <dd>{recordText(records)}</dd>
         </div>
       </dl>

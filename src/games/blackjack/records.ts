@@ -6,7 +6,7 @@ import type { Records, RecordsStore } from './records-model.ts';
 
 export const RECORDS_KEY = 'dopagaki:blackjack:records';
 /** 保存する形式の版。形式を変えるときは上げる。版の違う保存内容は捨てる */
-const VERSION = 2;
+const VERSION = 3;
 
 type StoreOptions = {
   storage: StorageLike | null;

@@ -43,6 +43,19 @@ describe('countUpValue', () => {
 
   test('長さが 0 なら最初から目標', () => {
     expect(countUpValue(42, 0, 0)).toBe(42);
+    expect(countUpValue(42, 0, 0, -300)).toBe(42);
+  });
+
+  test('始まりの値を渡すと、そこから目標へ数える。目標が小さければ減っていく', () => {
+    expect(countUpValue(500, 0, 800, 200)).toBe(200);
+    expect(countUpValue(500, 800, 800, 200)).toBe(500);
+    let prev = 200;
+    for (let ms = 0; ms <= 800; ms += 10) {
+      const v = countUpValue(-300, ms, 800, 200);
+      expect(v).toBeLessThanOrEqual(prev);
+      prev = v;
+    }
+    expect(prev).toBe(-300);
   });
 });
 

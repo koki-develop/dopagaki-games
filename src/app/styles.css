@@ -2803,10 +2803,31 @@ p {
   text-align: right;
 }
 
-.bj-records > div:first-child dd {
+/*
+ * 記録の見出しの字体・大きさ・字間は英大文字に合わせてあり、極太の字体の小さな漢字は潰れて読めない。
+ * 日本語の見出しは本文の字体の太字にして、英字の見出しと並ぶ大きさにする
+ */
+.rv-records dt.label-ja,
+.bj-records dt.label-ja {
+  font-family: var(--body);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.bj-best dd {
   color: var(--gold);
   font-size: 22px;
   text-shadow: 0 0 10px rgb(var(--gold-rgb) / 0.5);
+}
+
+/* 増減の累計。増やしていれば金、減らしていれば暗く */
+.bj-lifetime dd[data-sign='plus'] {
+  color: var(--gold);
+}
+
+.bj-lifetime dd[data-sign='minus'] {
+  color: var(--muted);
 }
 
 [data-outcome='profit'] .bj-result-heading {
@@ -2943,6 +2964,13 @@ p {
   margin-bottom: 0.2em;
   text-shadow: 0 0 18px rgb(var(--gold-rgb) / 0.55);
   overflow-wrap: anywhere;
+}
+
+/* 結果画面の累計。最高スコアの欄の後に出て、このプレイの前の累計から数える */
+.bj-result-lifetime {
+  max-width: 320px;
+  margin: 0 0 16px;
+  animation: pop-in var(--result-pop-duration) var(--result-lifetime-at) cubic-bezier(0.2, 1.6, 0.4, 1) both;
 }
 
 [data-outcome='loss'] .bj-result-total-value,

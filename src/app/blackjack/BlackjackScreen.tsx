@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createControllerStore } from '../../games/blackjack/controller.ts';
+import { lifetimeNet } from '../../games/blackjack/records-model.ts';
 import { blackjackRecords } from '../../games/blackjack/records.ts';
 import { createGameSession } from '../../games/blackjack/session.ts';
 import { blackjackSettings, BLACKJACK_SETTING_ITEMS } from '../../games/blackjack/settings.ts';
@@ -100,7 +101,7 @@ export default function BlackjackScreen() {
         dispatch={dispatch}
       />
 
-      {phase.k === 'result' && <ResultView result={phase.result} onRetry={() => dispatch({ t: 'retry' })} onTitle={() => dispatch({ t: 'toTitle' })} />}
+      {phase.k === 'result' && <ResultView result={phase.result} lifetime={lifetimeNet(rec)} onRetry={() => dispatch({ t: 'retry' })} onTitle={() => dispatch({ t: 'toTitle' })} />}
 
       {phase.k === 'error' && <FatalView cause={phase.cause} message={phase.message} />}
 

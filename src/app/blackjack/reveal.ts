@@ -19,4 +19,6 @@ export const RESULT_REVEAL = {
   totalCountMs: 1100,
   /** 合計を数え終えてから、記録の更新が弾けて出るまで */
   newBestAfterMs: 150,
+  /** 累計の欄は、記録の更新が弾けて出終えた時刻に出て、このプレイの前の累計から今の累計へ、この長さで数える */
+  lifetimeCountMs: 700,
 } as const;

@@ -1,7 +1,9 @@
-import { formatScore } from '../../shared/format.ts';
+import { formatScore, formatSigned } from '../../shared/format.ts';
+import { lifetimeNet } from '../../games/blackjack/records-model.ts';
 import type { Records } from '../../games/blackjack/records-model.ts';
 import Link from '../ui/Link.tsx';
 import Overlay from '../ui/Overlay.tsx';
+import { signOf } from './summary.ts';
 
 type Props = {
   records: Records;
@@ -10,9 +12,10 @@ type Props = {
 };
 
 /**
- * タイトル。スタートでその場でプレイを始める。最高スコアを見せる
+ * タイトル。スタートでその場でプレイを始める。最高スコアと、これまでのプレイの増減の累計を見せる
  */
 export default function TitleView({ records, onStart, onSettings }: Props) {
+  const lifetime = lifetimeNet(records);
   return (
     <Overlay
       top={
@@ -36,9 +39,13 @@ export default function TitleView({ records, onStart, onSettings }: Props) {
       </button>
 
       <dl className="bj-records">
-        <div>
+        <div className="bj-best">
           <dt>BEST CHIPS</dt>
           <dd>{formatScore(records.bestScore)}</dd>
+        </div>
+        <div className="bj-lifetime">
+          <dt className="label-ja">累計</dt>
+          <dd data-sign={signOf(lifetime)}>{formatSigned(lifetime)}</dd>
         </div>
       </dl>
     </Overlay>
