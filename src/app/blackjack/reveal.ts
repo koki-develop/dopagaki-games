@@ -19,6 +19,29 @@ export const RESULT_REVEAL = {
   totalCountMs: 1100,
   /** 合計を数え終えてから、記録の更新が弾けて出るまで */
   newBestAfterMs: 150,
-  /** 累計の欄は、記録の更新が弾けて出終えた時刻に出て、このプレイの前の累計から今の累計へ、この長さで数える */
+  /**
+   * 累計の欄は合計と同時に出て、スコアの演出（合計のカウントアップと、更新したら NEW BEST!）が終わるまでこのプレイの前の累計を見せる。
+   * 終わってから lifetimeAfterMs 置いて、今の累計へ lifetimeCountMs かけて数える
+   */
+  lifetimeAfterMs: 150,
   lifetimeCountMs: 700,
 } as const;
+
+/** 結果画面の演出のうち、内訳の行の数と記録の更新で決まる時刻（ms、結果画面を出した時点から） */
+export type ResultTimeline = {
+  /** 合計のカウントアップを始め、合計と累計の欄が弾けて出る時刻 */
+  totalAt: number;
+  /** NEW BEST! が弾けて出る時刻 */
+  newBestAt: number;
+  /** 累計を数え始める時刻 */
+  lifetimeCountAt: number;
+};
+
+/** lineCount は得点の内訳の行の数、newBest は最高スコアを更新したか */
+export function resultTimeline(lineCount: number, newBest: boolean): ResultTimeline {
+  const totalAt = RESULT_REVEAL.sheetAtMs + lineCount * RESULT_REVEAL.lineStepMs;
+  const totalEnd = totalAt + RESULT_REVEAL.totalCountMs;
+  const newBestAt = totalEnd + RESULT_REVEAL.newBestAfterMs;
+  const scoreSettled = newBest ? newBestAt + RESULT_REVEAL.popMs : totalEnd;
+  return { totalAt, newBestAt, lifetimeCountAt: scoreSettled + RESULT_REVEAL.lifetimeAfterMs };
+}

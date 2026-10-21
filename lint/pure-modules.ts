@@ -13,6 +13,7 @@ export const PURE_MODULES: readonly string[] = [
   'src/app/game/result-best.ts',
   'src/app/reversi/summary.ts',
   'src/app/blackjack/summary.ts',
+  'src/app/blackjack/reveal.ts',
   'src/games/breakout/config.ts',
   'src/games/breakout/controller.ts',
   'src/games/breakout/hud/layout.ts',

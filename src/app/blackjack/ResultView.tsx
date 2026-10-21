@@ -7,7 +7,7 @@ import BestLine from '../game/BestLine.tsx';
 import { resultBestOf, resultBestText } from '../game/result-best.ts';
 import { useCountUp } from '../game/useCountUp.ts';
 import Overlay from '../ui/Overlay.tsx';
-import { RESULT_REVEAL } from './reveal.ts';
+import { RESULT_REVEAL, resultTimeline } from './reveal.ts';
 import { lifetimeSpan, sheetLines, signOf, verdictText } from './summary.ts';
 
 type Props = {
@@ -20,7 +20,8 @@ type Props = {
 
 /**
  * 結果画面。決着と始めからの増減を出し、得点の内訳を 1 行ずつ出してから、最後の手持ち（スコア）をカウントアップする。
- * 合計の下に最高スコア（更新したらその知らせ）を出し、最後に累計をこのプレイの前の値から今の値へ数える。減らして終えた見出しは光らせない
+ * 合計の下に最高スコア（更新したらその知らせ）を出す。累計の欄は合計と同時に出してこのプレイの前の値を見せ、スコアの演出が終わってから今の値へ数える。
+ * 累計の色は、見せている値の符号に合わせる。減らして終えた見出しは光らせない
  */
 export default function ResultView({ result, lifetime, onRetry, onTitle }: Props) {
   const headingId = useId();
@@ -28,13 +29,11 @@ export default function ResultView({ result, lifetime, onRetry, onTitle }: Props
   const lines = sheetLines(result);
   const s = result.score;
   const net = runNet(result);
-  const totalAt = RESULT_REVEAL.sheetAtMs + lines.length * RESULT_REVEAL.lineStepMs;
+  const { totalAt, newBestAt, lifetimeCountAt } = resultTimeline(lines.length, result.newBest);
   const total = useCountUp(s.total, totalAt, RESULT_REVEAL.totalCountMs);
   const best = resultBestOf(result.newBest, result.previousBest);
-  const newBestAt = totalAt + RESULT_REVEAL.totalCountMs + RESULT_REVEAL.newBestAfterMs;
-  const lifetimeAt = newBestAt + RESULT_REVEAL.popMs;
   const span = lifetimeSpan(result, lifetime);
-  const shownLifetime = useCountUp(span.to, lifetimeAt, RESULT_REVEAL.lifetimeCountMs, span.from);
+  const shownLifetime = useCountUp(span.to, lifetimeCountAt, RESULT_REVEAL.lifetimeCountMs, span.from);
 
   const style = {
     '--result-heading-duration': `${RESULT_REVEAL.headingMs}ms`,
@@ -44,7 +43,6 @@ export default function ResultView({ result, lifetime, onRetry, onTitle }: Props
     '--result-line-step': `${RESULT_REVEAL.lineStepMs}ms`,
     '--result-total-at': `${totalAt}ms`,
     '--result-newbest-delay': `${newBestAt}ms`,
-    '--result-lifetime-at': `${lifetimeAt}ms`,
   } as CSSProperties;
 
   return (
@@ -100,7 +98,7 @@ export default function ResultView({ result, lifetime, onRetry, onTitle }: Props
       <dl className="bj-records bj-result-lifetime">
         <div className="bj-lifetime">
           <dt className="label-ja">累計</dt>
-          <dd data-sign={signOf(span.to)}>{formatSigned(shownLifetime)}</dd>
+          <dd data-sign={signOf(shownLifetime)}>{formatSigned(shownLifetime)}</dd>
         </div>
       </dl>
 

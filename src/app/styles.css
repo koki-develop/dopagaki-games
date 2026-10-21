@@ -2966,11 +2966,11 @@ p {
   overflow-wrap: anywhere;
 }
 
-/* 結果画面の累計。最高スコアの欄の後に出て、このプレイの前の累計から数える */
+/* 結果画面の累計。合計と同時に出て、このプレイの前の累計を見せてから数える */
 .bj-result-lifetime {
   max-width: 320px;
   margin: 0 0 16px;
-  animation: pop-in var(--result-pop-duration) var(--result-lifetime-at) cubic-bezier(0.2, 1.6, 0.4, 1) both;
+  animation: pop-in var(--result-pop-duration) var(--result-total-at) cubic-bezier(0.2, 1.6, 0.4, 1) both;
 }
 
 [data-outcome='loss'] .bj-result-total-value,
